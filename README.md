@@ -23,11 +23,12 @@ buildscript {
 5. Install [Android Studio](https://developer.android.com/studio/)
 6. File > Settings > Plugins < Browse repositories
 7. Type "Flutter" and install
-8. Open VS Code
-9. Extensions 
-10. Type "Flutter" and install
-11. Type "Material Icon Theme", Install and activate
-12. Run the following command
+8. Type "Android WiFi Connect" and install
+9. Open VS Code
+10. Extensions 
+11. Type "Flutter" and install
+12. Type "Material Icon Theme", Install and activate
+13. Run the following command
 ```
 flutter doctor
 ```
@@ -50,29 +51,82 @@ flutter create flutter_course
 flutter run
 ```
 
-## main.dart
+## main.dart with named routes
 ```
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
-import './product_manager.dart';
+import './pages/auth.dart';
+import './pages/products_admin.dart';
+import './pages/products.dart';
+import './pages/product.dart';
 
 void main() {
+  //debugPaintSizeEnabled = true;
+  //debugPaintBaselinesEnabled = true;
+  //debugPaintPointersEnabled = true;
   runApp(MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
+  @override
+    State<StatefulWidget> createState() {
+      return _MyAppState();
+    }
+}
+
+class _MyAppState extends State<MyApp> {
+  List<Map<String, String>> _products = [];
+
+  void _addProduct(Map<String, String>  product) {
+    setState(() {
+      _products.add(product);
+    });
+  }
+
+  void _deleteProduct(int index) {
+    setState(() {
+      _products.removeAt(index);
+    });
+  }
+
+  dynamic staticRoutes() {
+    return {
+           '/': (BuildContext context) => ProductsPage(_products, _addProduct, _deleteProduct),
+           '/admin': (BuildContext context) => ProductsAdminPage()
+        };
+  }
+
+  Route<bool> dynamicRouteHandler(RouteSettings settings) {
+    final List<String> pathElements = settings.name.split('/');
+    if (pathElements[0] != '') {
+      return null;
+    }
+    if (pathElements[1] == 'product') {
+      final int index = int.parse(pathElements[2]);
+      return MaterialPageRoute<bool>(
+          builder: (BuildContext context) =>
+              ProductPage(_products[index]['title'], _products[index]['image']));
+    }
+    return null;
+  }
+
+   Route<bool> unknownRouteHandler(RouteSettings settings) {
+     return MaterialPageRoute(builder: (BuildContext context) => ProductsPage(_products, _addProduct, _deleteProduct));
+   }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+        //debugShowMaterialGrid: true,
         theme: ThemeData(
             brightness: Brightness.light,
             primarySwatch: Colors.deepOrange,
             accentColor: Colors.deepPurple),
-        home: Scaffold(
-            appBar: AppBar(
-              title: Text('EasyList'),
-            ),
-            body: ProductManager(startingProduct: 'Food Tester')));
+        //home: AuthPage(),
+        routes: staticRoutes(),
+        onGenerateRoute: dynamicRouteHandler,
+        onUnknownRoute: unknownRouteHandler);
   }
 }
 ```
@@ -162,6 +216,8 @@ class Products extends StatelessWidget {
 
 ## Useful notes
 * [Learn Dart](https://www.dartlang.org/)
+* Ctrl+Shift+F5 = Hot Reload
+* Ctrl+F5 = Hot Restart
 * @override is optional
 * State widgets call build when loaded and when internal data changes.
 * Stateless widgets call build when loaded and when external data changes.
@@ -191,6 +247,7 @@ Products([this.products = const []])
 ```
 final Function addProduct;
 ```
+* build()  must not return null but can return container()
 
 ## Material Components Widgets
 [Material Components Widgets](https://flutter.io/widgets/material/)
@@ -207,6 +264,205 @@ final Function addProduct;
 5. Use the image with the following syntax
 ```
 Image.asset('assets/food.jpg')
+```
+
+## List View
+1. This method will render all items
+```
+import 'package:flutter/material.dart';
+
+class Products extends StatelessWidget {
+  final List<String> products;
+
+  Products([this.products = const []]){
+    print('[Products Widget] Constructor');
+  }
+
+ //Using a ListView will by default RENDER all items
+  @override
+  Widget build(BuildContext context) {
+    print('[Products Widget] build');
+    return ListView(
+        children: products
+            .map((product) => Card(
+                  child: Column(children: <Widget>[
+                    Image.asset('assets/food.jpg'),
+                    Text(product)
+                  ]),
+                ))
+            .toList());
+  }
+}
+```
+2. This method will only render items on the screen
+```
+import 'package:flutter/material.dart';
+
+class Products extends StatelessWidget {
+  final List<String> products;
+
+  Products([this.products = const []]) {
+    print('[Products Widget] Constructor');
+  }
+
+  Widget _buildProductItem(BuildContext context, int index) {
+    return Card(
+        child: Column(children: <Widget>[
+      Image.asset('assets/food.jpg'),
+      Text(products[index])
+    ]));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    print('[Products Widget] build');
+    return ListView.builder(
+        itemBuilder: _buildProductItem, itemCount: products.length);
+  }
+}
+```
+
+##Navigation
+1. Navigate to new page handling return value
+```
+        FlatButton(
+            child: Text('Details'),
+            onPressed: () => Navigator.pushNamed<bool>(context, '/product/' + index.toString())
+                        .then((bool result) {
+                            if (result)
+                            {
+                                deleteProduct(index);
+                            }
+                        }))
+```
+2. Navifate to named route
+```
+Navigator.pushReplacementNamed(context, '/admin');
+```
+3. Navigate to new page not allowing user to go back
+```
+RaisedButton(
+                child: Text('LOGIN'),
+                onPressed: () {
+                   Navigator.pushReplacementNamed(context, '/');
+                }
+```				
+4. Navigate back
+```
+    return WillPopScope(
+        onWillPop: (){
+          print('Back button pressed!');
+          Navigator.pop(context, false);
+		   //allows user to leave
+            return Future.value(false);
+        },
+        child: RaisedButton(
+                          color: Theme.of(context).accentColor,
+                          child: Text('DELETE'),
+                          onPressed: () => Navigator.pop(context, true)));
+```
+
+##Map Object = json
+```
+Map<String, String>
+Map<String, String> product = {'title': 'Chocolate', 'image': 'assets/food.jpg'}
+product['title']
+```
+
+##Tabs
+```
+import 'package:flutter/material.dart';
+
+import './products.dart';
+import './product_create.dart';
+import './product_list.dart';
+
+class ProductsAdminPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        drawer: Drawer(
+          child: Column(
+            children: <Widget>[
+              AppBar(
+                automaticallyImplyLeading: false,
+                title: Text('Choose'),
+              ),
+              ListTile(
+                title: Text('All Products'),
+                onTap: () {
+                  Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                          builder: (BuildContext context) => ProductsPage()));
+                },
+              )
+            ],
+          ),
+        ),
+        //bottomNavigationBar
+        appBar: AppBar(
+          title: Text('Manage Products'),
+          bottom: TabBar(
+            tabs: <Widget>[
+              Tab(
+                icon: Icon(Icons.create),
+                text: 'Create Product',
+              ),
+              Tab(
+                icon: Icon(Icons.list),
+                text: 'My Products',
+              ),
+            ],
+          ),
+        ),
+        body: TabBarView(children: <Widget>[
+          ProductCreatePage(),
+          ProductListPage()
+        ],),
+      ),
+    );
+  }
+}
+```
+
+##Dialog
+```
+  _showWarningDialog(BuildContext context) {
+    showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+              title: Text('Are you sure?'),
+              content: Text('This action cannot be undone!'),
+              actions: <Widget>[
+                FlatButton(
+                    child: Text('DISCARD'),
+                    onPressed: () {
+                      //Closes dialog
+                      Navigator.pop(context);
+                    }),
+                FlatButton(
+                    child: Text('CONTINUE'),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.pop(context, true);
+                    })
+              ]);
+        });
+  }
+ onPressed: () => _showWarningDialog(context)))
+```
+
+##Modal
+```
+onPressed: () {
+        showModalBottomSheet(context:context, builder: (BuildContext context){
+          return Center(child: Text('This is a Modal!'));
+        });
+      }
 ```
 
 ## Authors
