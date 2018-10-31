@@ -51,6 +51,41 @@ flutter create flutter_course
 flutter run
 ```
 
+## Useful notes
+* [Learn Dart](https://www.dartlang.org/)
+* Ctrl+Shift+F5 = Hot Reload
+* Ctrl+F5 = Hot Restart
+* @override is optional
+* State widgets call build when loaded and when internal data changes.
+* Stateless widgets call build when loaded and when external data changes.
+* Wrap code in setState(){} which modifies state
+```
+ setState(() {
+	_products.add('Advanved Food Tester');
+});
+```
+* Access widget properties in state by using widget.property. No need to call setState in initState.
+```
+ @override
+    void initState() {
+      _products.add(widget.startingProduct);
+      super.initState();
+    }
+```
+* Named constructor params and optional params
+```
+ProductManager({this.startingProduct = 'Sweets Tester'})
+```
+* Optional params only
+```
+Products([this.products = const []])
+```
+* Pass functions (delegates)
+```
+final Function addProduct;
+```
+* build()  must not return null but can return container()
+
 ## main.dart with named routes
 ```
 import 'package:flutter/material.dart';
@@ -214,41 +249,6 @@ class Products extends StatelessWidget {
 }
 ```
 
-## Useful notes
-* [Learn Dart](https://www.dartlang.org/)
-* Ctrl+Shift+F5 = Hot Reload
-* Ctrl+F5 = Hot Restart
-* @override is optional
-* State widgets call build when loaded and when internal data changes.
-* Stateless widgets call build when loaded and when external data changes.
-* Wrap code in setState(){} which modifies state
-```
- setState(() {
-	_products.add('Advanved Food Tester');
-});
-```
-* Access widget properties in state by using widget.property. No need to call setState in initState.
-```
- @override
-    void initState() {
-      _products.add(widget.startingProduct);
-      super.initState();
-    }
-```
-* Named constructor params and optional params
-```
-ProductManager({this.startingProduct = 'Sweets Tester'})
-```
-* Optional params only
-```
-Products([this.products = const []])
-```
-* Pass functions (delegates)
-```
-final Function addProduct;
-```
-* build()  must not return null but can return container()
-
 ## Material Components Widgets
 [Material Components Widgets](https://flutter.io/widgets/material/)
 
@@ -322,7 +322,7 @@ class Products extends StatelessWidget {
 }
 ```
 
-##Navigation
+## Navigation
 1. Navigate to new page handling return value
 ```
         FlatButton(
@@ -369,7 +369,7 @@ Map<String, String> product = {'title': 'Chocolate', 'image': 'assets/food.jpg'}
 product['title']
 ```
 
-##Tabs
+## Tabs
 ```
 import 'package:flutter/material.dart';
 
@@ -428,7 +428,7 @@ class ProductsAdminPage extends StatelessWidget {
 }
 ```
 
-##Dialog
+## Dialog
 ```
   _showWarningDialog(BuildContext context) {
     showDialog(
