@@ -46,7 +46,14 @@ flutter create flutter_course
 ```
 8. Open Android Studio and open myapp\android
 9. Tools > AVD Manager > Create new Virtual Device with latest SDK version.
-10. In VS Code Press F5 to launch or type
+10. Create the following folders
+```
+assets
+fonts
+pages
+widgets
+```
+11. In VS Code Press F5 to launch or type
 ```
 flutter run
 ```
@@ -56,6 +63,7 @@ flutter run
 * Ctrl+Shift+F5 = Hot Reload
 * Ctrl+F5 = Hot Restart
 * @override is optional
+* prefix with _ for private fields.
 * State widgets call build when loaded and when internal data changes.
 * Stateless widgets call build when loaded and when external data changes.
 * Wrap code in setState(){} which modifies state
@@ -97,23 +105,23 @@ import './pages/products.dart';
 import './pages/product.dart';
 
 void main() {
-  //debugPaintSizeEnabled = true;
-  //debugPaintBaselinesEnabled = true;
-  //debugPaintPointersEnabled = true;
+  debugPaintSizeEnabled = false;
+  debugPaintBaselinesEnabled = false;
+  debugPaintPointersEnabled = false;
   runApp(MyApp());
 }
 
 class MyApp extends StatefulWidget {
   @override
-    State<StatefulWidget> createState() {
-      return _MyAppState();
-    }
+  State<StatefulWidget> createState() {
+    return _MyAppState();
+  }
 }
 
 class _MyAppState extends State<MyApp> {
-  List<Map<String, String>> _products = [];
+  List<Map<String, dynamic>> _products = [];
 
-  void _addProduct(Map<String, String>  product) {
+  void _addProduct(Map<String, dynamic> product) {
     setState(() {
       _products.add(product);
     });
@@ -127,9 +135,11 @@ class _MyAppState extends State<MyApp> {
 
   dynamic staticRoutes() {
     return {
-           '/': (BuildContext context) => ProductsPage(_products, _addProduct, _deleteProduct),
-           '/admin': (BuildContext context) => ProductsAdminPage()
-        };
+      '/': (BuildContext context) => AuthPage(),
+      '/products': (BuildContext context) => ProductsPage(_products),
+      '/admin': (BuildContext context) =>
+          ProductsAdminPage(_addProduct, _deleteProduct)
+    };
   }
 
   Route<bool> dynamicRouteHandler(RouteSettings settings) {
@@ -140,111 +150,74 @@ class _MyAppState extends State<MyApp> {
     if (pathElements[1] == 'product') {
       final int index = int.parse(pathElements[2]);
       return MaterialPageRoute<bool>(
-          builder: (BuildContext context) =>
-              ProductPage(_products[index]['title'], _products[index]['image']));
+          builder: (BuildContext context) => ProductPage(
+              _products[index]['title'],
+                _products[index]['image'],
+                _products[index]['price'],
+                _products[index]['description']),);
     }
     return null;
   }
 
-   Route<bool> unknownRouteHandler(RouteSettings settings) {
-     return MaterialPageRoute(builder: (BuildContext context) => ProductsPage(_products, _addProduct, _deleteProduct));
-   }
+  Route<bool> unknownRouteHandler(RouteSettings settings) {
+    return MaterialPageRoute(
+        builder: (BuildContext context) => ProductsPage(_products));
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
         //debugShowMaterialGrid: true,
         theme: ThemeData(
+            //fontFamily: 'Oswald',
             brightness: Brightness.light,
             primarySwatch: Colors.deepOrange,
-            accentColor: Colors.deepPurple),
+            accentColor: Colors.deepPurple,
+            buttonColor: Colors.deepPurple),
         //home: AuthPage(),
         routes: staticRoutes(),
         onGenerateRoute: dynamicRouteHandler,
         onUnknownRoute: unknownRouteHandler);
   }
 }
+
 ```
 
-## product_manager.dart
+## Stateless Widget
+* Create build methods to keep the build() method clean.
 ```
 import 'package:flutter/material.dart';
 
-import './products.dart';
+import './price_tag.dart';
+import './address_tag.dart';
+import '../ui_elements/title_default.dart';
 
-class ProductManager extends StatefulWidget {
-  final String startingProduct;
+class ProductCard extends StatelessWidget {
+  final Map<String, dynamic> product;
+  final int productIndex;
 
-  ProductManager({this.startingProduct = 'Sweets Tester'}) {
-    print('[ProductManager Widget] Constructor');
+  ProductCard(this.product, this.productIndex);
+
+  Widget _buildTitlePriceRow()
+  {
+    return ...
   }
 
-  @override
-  State<StatefulWidget> createState() {
-    print('[ProductManager Widget] createState');
-    return _ProductManagerState();
-  }
-}
-
-class _ProductManagerState extends State<ProductManager> {
-  List<String> _products = [];
-
-  @override
-  void initState() {
-    print('[ProductManager State] initState');
-    _products.add(widget.startingProduct);
-    super.initState();
-  }
-
-  @override
-  void didUpdateWidget(ProductManager oldWidget) {
-    print('[ProductManager State] didUpdateWidget');
-    super.didUpdateWidget(oldWidget);
+  Widget _buildActionButtons(BuildContext context)
+  {
+    return ...
   }
 
   @override
   Widget build(BuildContext context) {
-    print('[ProductManager State] build');
-    return Column(children: [
-      Container(
-          margin: EdgeInsets.all(10.0),
-          child: RaisedButton(
-              color: Theme.of(context).primaryColor,
-              onPressed: () {
-                setState(() {
-                  _products.add('Advanved Food Tester');
-                });
-              },
-              child: Text('Add Product'))),
-      Products(_products)
-    ]);
-  }
-}
-```
-
-## products.dart
-```
-import 'package:flutter/material.dart';
-
-class Products extends StatelessWidget {
-  final List<String> products;
-
-  Products([this.products = const []]){
-    print('[Products Widget] Constructor');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    print('[Products Widget] build');
-    return Column(
-        children: products
-            .map((product) => Card(
-                  child: Column(children: <Widget>[
-                    Image.asset('assets/food.jpg'),
-                    Text(product)
-                  ]),
-                ))
-            .toList());
+    // TODO: implement build
+    return Card(
+        child: Column(children: <Widget>[
+      Image.asset(product['image']),
+      _buildTitlePriceRow(),
+      AddressTag('Union Square, San Francisco'),
+      _buildActionButtons(context)
+    ]));
   }
 }
 ```
@@ -264,6 +237,23 @@ class Products extends StatelessWidget {
 5. Use the image with the following syntax
 ```
 Image.asset('assets/food.jpg')
+```
+
+## Fonts
+1. Create a new folder named fonts
+2. Copy .ttf fonts into  assets
+3. Edit pubspec.yaml
+4. Add font to assets:
+```
+  fonts:
+    - family: Oswald
+      fonts:
+         - asset: fonts/Oswald-Bold.ttf
+           weight: 700
+```
+5. Use the font with the following syntax
+```
+Text(products[index]['title'], style: TextStyle(fontSize: 26.0, fontWeight: FontWeight.bold, fontFamily: 'Oswald'))
 ```
 
 ## List View
@@ -439,7 +429,7 @@ class ProductsAdminPage extends StatelessWidget {
               content: Text('This action cannot be undone!'),
               actions: <Widget>[
                 FlatButton(
-                    child: Text('DISCARD'),
+                    child: Text('DISCARD'),  
                     onPressed: () {
                       //Closes dialog
                       Navigator.pop(context);
@@ -447,7 +437,7 @@ class ProductsAdminPage extends StatelessWidget {
                 FlatButton(
                     child: Text('CONTINUE'),
                     onPressed: () {
-                      Navigator.pop(context);
+                      Navigator.pop(context); 
                       Navigator.pop(context, true);
                     })
               ]);
@@ -463,6 +453,75 @@ onPressed: () {
           return Center(child: Text('This is a Modal!'));
         });
       }
+```
+
+## Rows/Columns
+* Expanded takes all available space
+* flex property distributes space relatively
+```
+Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Flexible(
+              flex: 10,
+              child:Text(products[index]['title'],
+                style: TextStyle(
+                    fontSize: 26.0,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'Oswald'))),
+            SizedBox(width: 8.0),
+             Expanded(
+                flex: 10,
+               child:Container(
+                padding: EdgeInsets.symmetric(horizontal: 6.0, vertical: 2.5),
+                decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(5.0),
+                    color: Theme.of(context).accentColor),
+                child: Text('\$${products[index]['price'].toString()}',
+                    style: TextStyle(color: Colors.white))))
+          ],
+        )
+```
+
+## Icons
+1. Navigation icon
+```
+ ListTile(
+          leading: Icon(Icons.edit),
+          title: Text('Manage Products'), onTap: (){
+            Navigator.pushReplacementNamed(context, '/admin');
+        }) 
+```
+
+2. Icon Button
+```
+ IconButton(
+            icon: Icon(Icons.info),
+            color: Theme.of(context).accentColor,
+            onPressed: () => Navigator.pushNamed<bool>(
+                context, '/product/' + index.toString())),
+                 IconButton(
+            color: Colors.red,
+            icon: Icon(Icons.favorite_border),
+            onPressed: () {
+              
+            })
+```
+
+## Media Queries
+```
+final double deviceWidth =  MediaQuery.of(context).size.width;
+final targetWidth = deviceWidth > 550.0 ? 500.0 : deviceWidth * 0.95;
+```
+
+## Custom Buttons
+```
+ GestureDetector(
+                child: Container(
+                    color: Colors.green,
+                    padding: EdgeInsets.all(5.0),
+                    child: Text('My Button')),
+                onTap: () {})
 ```
 
 ## Authors
