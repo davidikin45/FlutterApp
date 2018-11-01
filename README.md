@@ -100,6 +100,28 @@ final Function addProduct;
 1. Create a new project using [Firebase](https://firebase.google.com/)
 2. Database > Create Realtime Database
 3. Start in test mode
+4. Authentication > Set up sign-in method
+5. Email/Password
+6. [Firebase Auth REST API](https://firebase.google.com/docs/reference/rest/auth/)
+7. Authentication > Web setup > apiKey
+8. Signup
+```
+https://www.googleapis.com/identitytoolkit/v3/relyingparty/signupNewUser?key=[API_KEY]
+```
+9. Login
+```
+https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key=[API_KEY]
+```
+10. Database > Rules to enable authentication
+```
+{
+  "rules": {
+    ".read": "auth != null",
+    ".write": "auth != null"
+  }
+}
+```
+
 
 ## Http Requests
 * (flutter http)[https://pub.dartlang.org/packages/http]
@@ -119,37 +141,106 @@ dependencies:
 flutter packages get
 ```
 
-## /api/api-response.dart
+## /shared/result.dart
 ```
-class ApiResponse<T> 
+import 'package:flutter/material.dart';
+
+class ApiResult<T> extends DataResult<T>
 {
-  final bool success;
-  final T data;
   final String body;
 
-  ApiResponse(this.success, this.body, this.data);
+  ApiResult({@required bool success, @required T data, @required this.body, String message = ''}) : super(success:success,data: data, message:message);
+}
+
+class DataResult<T> extends Result
+{
+  final T data;
+
+ DataResult({@required bool success, @required this.data, String message = ''}) : super(success:success,message:message);
+}
+
+class Result
+{
+  final bool success;
+  final String message;
+
+  static Result ok([String successMessage = ''])
+  {
+    return Result(success: true, message: successMessage);
+  }
+
+  static Result fail(String errorMessage)
+  {
+    return Result(success: false, message: errorMessage);
+  }
+
+  static DataResult<T> okData<T>(T data, [String successMessage = ''])
+  {
+    return DataResult<T>(success: true,data: data, message: successMessage);
+  }
+
+  static DataResult<T> failData<T>(String errorMessage)
+  {
+    return DataResult<T>(success: false, data: null, message: errorMessage);
+  }
+
+  static ApiResult<T> okApi<T>(T data, String body, [String successMessage = ''])
+  {
+    return ApiResult<T>(success: true,data: data, body:body, message: null);
+  }
+
+  static ApiResult<T> failApi<T>(T data, String body, String errorMessage)
+  {
+    return ApiResult<T>(success: false, data: data, body:body, message: errorMessage);
+  }
+
+  Result({@required this.success, this.message = ''});
 }
 ```
 
-## /api/product-api.dart
+## /apis/base.dart
 ```
 import 'package:http/http.dart' as http;
+import '../shared/result.dart';
 import 'dart:convert';
 
-import './api-response.dart';
+abstract class ApiBase {
+  String getRequestData(Object payload) {
+    return json.encode(payload);
+  }
+
+  ApiResult<Map<String, dynamic>> getResponseData(http.Response response) {
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      return Result.failApi(
+          'Response statusCode ${response.statusCode.toString()}',
+          response.body);
+    }
+
+    final Map<String, dynamic> responseData = json.decode(response.body);
+    return Result.okApi(responseData, response.body);
+  }
+}
+```
+
+## /apis/product.dart
+```
+import 'package:http/http.dart' as http;
+import './base.dart';
+
+import '../shared/result.dart';
 import '../models/product.dart';
 
-class ProductApi {
+class ProductApi extends ApiBase {
   final String baseUrl = 'https://flutter-products-43c5c.firebaseio.com';
 
-    Future<ApiResponse<List<Product>>> fetchAll() async {    
+    Future<ApiResult<List<Product>>> fetchAll() async {    
     var resp = await http.get(baseUrl + '/products.json');
         
-    var apiResponse = _getResponseData(resp);
+    var apiResponse = getResponseData(resp);
 
     if(!apiResponse.success)
     {
-      return ApiResponse<List<Product>>(false, apiResponse.body, null);
+      return Result.failApi<List<Product>>(apiResponse.errorMessage, apiResponse.body);
     }
 
     final List<Product> list = [];
@@ -169,10 +260,10 @@ class ProductApi {
         });
     }
 
-    return ApiResponse<List<Product>>(true, "", list);
+   return Result.okApi(list, apiResponse.body);
   }
 
-  Future<ApiResponse<Map<String, dynamic>>> add(String userEmail, String userId, String title, String description, String image, double price) async {
+  Future<ApiResult<Map<String, dynamic>>> add(String userEmail, String userId, String title, String description, String image, double price) async {
     final Map<String, dynamic> payload = {
       'title': title,
       'description': description,
@@ -182,14 +273,14 @@ class ProductApi {
       'userId': userId
     };
 
-    var resp = await http.post(baseUrl + '/products.json', body: _getRequestData(payload));
+    var resp = await http.post(baseUrl + '/products.json', body: getRequestData(payload));
 
-    var apiResponse = _getResponseData(resp);
+    var apiResponse = getResponseData(resp);
 
     return apiResponse;
   }
 
-  Future<ApiResponse<Map<String, dynamic>>> update(String id, String userEmail, String userId, String title, String description, String image, double price) async {
+  Future<ApiResult<Map<String, dynamic>>> update(String id, String userEmail, String userId, String title, String description, String image, double price) async {
     final Map<String, dynamic> payload = {
       'title': title,
       'description': description,
@@ -199,37 +290,62 @@ class ProductApi {
       'userId': userId
     };
 
-    var resp = await http.put(baseUrl + '/products/$id.json', body: _getRequestData(payload));
+    var resp = await http.put(baseUrl + '/products/$id.json', body: getRequestData(payload));
 
-    var apiResponse = _getResponseData(resp);
+    var apiResponse = getResponseData(resp);
 
     return apiResponse;
   }
 
-  Future<ApiResponse<Map<String, dynamic>>> delete(String id) async {
+  Future<ApiResult<Map<String, dynamic>>> delete(String id) async {
     var resp = await http.delete(baseUrl + '/products/$id.json');
 
-    var apiResponse = _getResponseData(resp);
+    var apiResponse = getResponseData(resp);
 
    return apiResponse;
   }
+}
+```
+## /apis/auth.dart
+```
+import 'package:http/http.dart' as http;
+import './base.dart';
 
-  String _getRequestData(Object payload) {
-    return json.encode(payload);
+import '../shared/result.dart';
+
+class AuthApi extends ApiBase {
+  final String apiKey = 'AIzaSyBezaAajSgJS53o2YnVH72MYKA8rW1QNR0';
+  final String baseUrl = 'https://www.googleapis.com/identitytoolkit/v3/relyingparty';
+
+  Future<ApiResult<Map<String, dynamic>>> signup(String email, String password) async {
+    final Map<String, dynamic> payload = {
+      'email': email,
+      'password': password,
+      'returnSecureToken': true
+    };
+
+    var resp = await http.post('$baseUrl/signupNewUser?key=$apiKey', body: getRequestBody(payload), headers: {'Content-Type:': 'application/json'});
+
+    var apiResponse = getResponseData(resp);
+
+    return apiResponse;
   }
 
-  ApiResponse<Map<String, dynamic>> _getResponseData(http.Response response) {
-     if(response.statusCode != 200 && response.statusCode != 201)
-    {
-      return ApiResponse(false, response.body, null);
-    }
+  Future<ApiResult<Map<String, dynamic>>> login(String email, String password) async {
+     final Map<String, dynamic> payload = {
+      'email': email,
+      'password': password,
+      'returnSecureToken': true
+    };
 
-    final Map<String, dynamic> responseData = json.decode(response.body);
-    return ApiResponse(true,  response.body, responseData);
+    var resp = await http.post('$baseUrl/verifyPassword?key=$apiKey', body: getRequestBody(payload), headers: {'Content-Type:': 'application/json'});
+
+    var apiResponse = getResponseData(resp);
+
+    return apiResponse;
   }
 }
 ```
-
 
 ## App State
 * (scoped model)https://pub.dartlang.org/packages/scoped_model
@@ -253,6 +369,14 @@ flutter packages get
 ScopedModelDescendant<MainModel>(builder: (BuildContext context, Widget child, MainModel model){
 return ...
 })
+```
+
+## models\auth.dart
+```
+enum AuthMode{
+  Signup,
+  Login
+}
 ```
 
 ## models\product.dart
@@ -291,7 +415,6 @@ import './user.dart';
 
 class MainModel extends Model with UserModel, ProductsModel {
    
-
 }
 ```
 
@@ -299,10 +422,13 @@ class MainModel extends Model with UserModel, ProductsModel {
 ```
 import 'package:scoped_model/scoped_model.dart';
 
+import '../models/auth.dart';
 import '../models/user.dart';
 import '../models/product.dart';
 
-import '../apis/product-api.dart';
+import '../apis/auth.dart';
+import '../apis/product.dart';
+import '../shared/result.dart';
 
 class CommonModel extends Model {
   String _selProductId;
@@ -332,8 +458,40 @@ class UtilityModel extends CommonModel {
 }
 
 class UserModel extends CommonModel {
-  void login(String email, String password) {
-    _authenticatedUser = User(id: 'asasasas', email: email, password: password);
+   Future<Result> authenticate(String email, String password, [AuthMode mode = AuthMode.Login]) async {
+     showSpinner();
+
+    try {
+      ApiResult<Map<String, dynamic>> resp;
+      if(mode == AuthMode.Login)
+      {
+         resp = await AuthApi().login(email, password);
+      }
+      else
+      {
+         resp = await AuthApi().signup(email, password);
+      }
+
+      if (!resp.success) {
+        hideSpinner();
+        var errorMessage = resp.data['error']['message'];
+
+        if (errorMessage == 'EMAIL_EXISTS') {
+          return Result.fail('This email already exists.');
+        }
+        else if (errorMessage == 'EMAIL_NOT_FOUND' || errorMessage == 'INVALID_PASSWORD') {
+          return Result.fail('Invalid credentials.');
+        }
+       
+        return Result.fail('Invalid credentials.');
+      }
+
+      hideSpinner();
+      return Result.ok('Authentication succeeded');
+    } catch (err) {
+      hideSpinner();
+      return Result.fail('Please try again!');
+    }
   }
 }
 
@@ -388,7 +546,7 @@ class ProductsModel extends CommonModel {
     }
   }
 
-  Future<bool> addProduct(
+  Future<Result> addProduct(
       String title, String description, String image, double price) async {
     showSpinner();
     try {
@@ -396,7 +554,7 @@ class ProductsModel extends CommonModel {
           _authenticatedUser.id, title, description, image, price);
       if (!resp.success) {
         hideSpinner();
-        return false;
+        return Result.fail('Please try again!');
       }
 
       final Product newProduct = Product(
@@ -410,14 +568,14 @@ class ProductsModel extends CommonModel {
       _products.add(newProduct);
 
       hideSpinner();
-      return true;
+      return Result.ok();
     } catch (err) {
       hideSpinner();
-      return false;
+      return Result.fail('Please try again!');
     }
   }
 
-  Future<bool> updateProduct(
+  Future<Result> updateProduct(
       String title, String description, String image, double price) async {
     showSpinner();
     try {
@@ -431,7 +589,7 @@ class ProductsModel extends CommonModel {
           price);
       if (!resp.success) {
         hideSpinner();
-        return false;
+        return Result.fail('Please try again!');
       }
 
       final updatedProduct = Product(
@@ -444,14 +602,14 @@ class ProductsModel extends CommonModel {
           userId: selectedProduct.userId);
       _products[selectedProductIndex] = updatedProduct;
       hideSpinner();
-      return true;
+      return Result.ok();
     } catch (err) {
       hideSpinner();
-      return false;
+      return Result.fail('Please try again!');
     }
   }
 
-  Future<bool> deleteProduct() async {
+  Future<Result> deleteProduct() async {
     final deletedProductId = selectedProduct.id;
     _products.removeAt(selectedProductIndex);
     _selProductId = null;
@@ -460,13 +618,13 @@ class ProductsModel extends CommonModel {
       var resp = await ProductApi().delete(deletedProductId);
       if (!resp.success) {
         hideSpinner();
-        return false;
+        return Result.fail('Please try again!');
       }
       hideSpinner();
-      return true;
+      return Result.ok();
     } catch (err) {
       hideSpinner();
-      return false;
+      return Result.fail('Please try again!');
     }
   }
 
@@ -583,9 +741,10 @@ class _MyAppState extends State<MyApp> {
 import 'package:flutter/material.dart';
 
 import 'package:scoped_model/scoped_model.dart';
+import '../shared/result.dart';
 
 import '../models/product.dart';
-import '../scoped-models/products.dart';
+import '../scoped-models/main.dart';
 
 class ProductEditPage extends StatefulWidget {
   @override
@@ -643,8 +802,7 @@ class _ProductEditPageState extends State<ProductEditPage> {
       decoration: InputDecoration(
         labelText: 'Product Price',
       ),
-      initialValue:
-          product == null ? '' : product.price.toString(),
+      initialValue: product == null ? '' : product.price.toString(),
       validator: (String value) {
         if (value.isEmpty ||
             !RegExp(r'^(?:[1-9]\d*|0)?(?:\.\d+)?$').hasMatch(value)) {
@@ -662,39 +820,70 @@ class _ProductEditPageState extends State<ProductEditPage> {
     );
   }
 
-  void _submitFormHandler(Function addProduct, Function updateProduct, [int selectedProductIndex]) {
+  void _showErrorMessage(String errorMessage)
+  {
+    showDialog(
+              context: context,
+              builder: (BuildContext context) {
+                return AlertDialog(
+                  title: Text(errorMessage),
+                  content: Text('Please try again!'),
+                  actions: <Widget>[
+                    FlatButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text('Okay'))
+                  ],
+                );
+              });
+  }
+
+  void _submitFormHandler(
+      Function addProduct, Function updateProduct, Function setSelectedProduct,
+      [int selectedProductIndex]) {
     if (!_formKey.currentState.validate()) {
       return;
     }
 
     _formKey.currentState.save();
 
-    if (selectedProductIndex == null) {
-      addProduct(Product(
-          title: _formData['title'],
-          description: _formData['description'],
-          price: _formData['price'],
-          image: _formData['image']));
+    if (selectedProductIndex == -1) {
+      addProduct(_formData['title'], _formData['description'],
+              _formData['image'], _formData['price'])
+          .then((Result result) {
+        if (result.success) {
+          Navigator.pushReplacementNamed(context, '/products')
+              .then((_) => setSelectedProduct(null));
+        } else {
+          _showErrorMessage(result.errorMessage);
+        }
+      });
     } else {
-      updateProduct(
-          Product(
-              title: _formData['title'],
-              description: _formData['description'],
-              price: _formData['price'],
-              image: _formData['image']));
+      updateProduct(_formData['title'], _formData['description'],
+              _formData['image'], _formData['price'])
+        .then((Result result) {
+        if (result.success) {
+          Navigator.pushReplacementNamed(context, '/products')
+              .then((_) => setSelectedProduct(null));
+        } else {
+          _showErrorMessage(result.errorMessage);
+        }
+      });
     }
-
-    Navigator.pushReplacementNamed(context, '/products');
   }
 
   Widget _buildSaveButton() {
-    return ScopedModelDescendant<ProductsModel>(
-        builder: (BuildContext context, Widget child, ProductsModel model) {
-      return RaisedButton(
-          child: Text('Save'),
-          textColor: Colors.white,
-          onPressed: () =>
-              _submitFormHandler(model.addProduct, model.updateProduct, model.selectedProductIndex));
+    return ScopedModelDescendant<MainModel>(
+        builder: (BuildContext context, Widget child, MainModel model) {
+      return model.isLoading
+          ? Center(child: CircularProgressIndicator())
+          : RaisedButton(
+              child: Text('Save'),
+              textColor: Colors.white,
+              onPressed: () => _submitFormHandler(
+                  model.addProduct,
+                  model.updateProduct,
+                  model.selectProduct,
+                  model.selectedProductIndex));
     });
   }
 
@@ -726,17 +915,19 @@ class _ProductEditPageState extends State<ProductEditPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ScopedModelDescendant<ProductsModel>(
-        builder: (BuildContext context, Widget child, ProductsModel model) {
-      final Widget pageContent = _buildPageContent(context, model.selectedProduct);
+    return ScopedModelDescendant<MainModel>(
+        builder: (BuildContext context, Widget child, MainModel model) {
+      final Widget pageContent =
+          _buildPageContent(context, model.selectedProduct);
 
-      return model.selectedProductIndex == null
+      return model.selectedProductIndex == -1
           ? pageContent
           : Scaffold(
               appBar: AppBar(title: Text('Edit Product')), body: pageContent);
     });
   }
 }
+
 ```
 
 ## Stateless Widget

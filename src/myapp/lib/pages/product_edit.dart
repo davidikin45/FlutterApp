@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:scoped_model/scoped_model.dart';
+import '../shared/result.dart';
 
 import '../models/product.dart';
 import '../scoped-models/main.dart';
@@ -79,24 +80,9 @@ class _ProductEditPageState extends State<ProductEditPage> {
     );
   }
 
-  void _submitFormHandler(
-      Function addProduct, Function updateProduct, Function setSelectedProduct,
-      [int selectedProductIndex]) {
-    if (!_formKey.currentState.validate()) {
-      return;
-    }
-
-    _formKey.currentState.save();
-
-    if (selectedProductIndex == -1) {
-      addProduct(_formData['title'], _formData['description'],
-              _formData['image'], _formData['price'])
-          .then((bool success) {
-        if (success) {
-          Navigator.pushReplacementNamed(context, '/products')
-              .then((_) => setSelectedProduct(null));
-        } else {
-          showDialog(
+  void _showErrorMessage(String errorMessage)
+  {
+    showDialog(
               context: context,
               builder: (BuildContext context) {
                 return AlertDialog(
@@ -109,13 +95,39 @@ class _ProductEditPageState extends State<ProductEditPage> {
                   ],
                 );
               });
+  }
+
+  void _submitFormHandler(
+      Function addProduct, Function updateProduct, Function setSelectedProduct,
+      [int selectedProductIndex]) {
+    if (!_formKey.currentState.validate()) {
+      return;
+    }
+
+    _formKey.currentState.save();
+
+    if (selectedProductIndex == -1) {
+      addProduct(_formData['title'], _formData['description'],
+              _formData['image'], _formData['price'])
+          .then((Result result) {
+        if (result.success) {
+          Navigator.pushReplacementNamed(context, '/products')
+              .then((_) => setSelectedProduct(null));
+        } else {
+          _showErrorMessage(result.message);
         }
       });
     } else {
       updateProduct(_formData['title'], _formData['description'],
               _formData['image'], _formData['price'])
-          .then((_) => Navigator.pushReplacementNamed(context, '/products')
-              .then((_) => setSelectedProduct(null)));
+        .then((Result result) {
+        if (result.success) {
+          Navigator.pushReplacementNamed(context, '/products')
+              .then((_) => setSelectedProduct(null));
+        } else {
+          _showErrorMessage(result.message);
+        }
+      });
     }
   }
 

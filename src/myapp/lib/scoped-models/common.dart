@@ -1,9 +1,12 @@
 import 'package:scoped_model/scoped_model.dart';
 
+import '../models/auth.dart';
 import '../models/user.dart';
 import '../models/product.dart';
 
-import '../apis/product-api.dart';
+import '../apis/auth.dart';
+import '../apis/product.dart';
+import '../shared/result.dart';
 
 class CommonModel extends Model {
   String _selProductId;
@@ -33,8 +36,40 @@ class UtilityModel extends CommonModel {
 }
 
 class UserModel extends CommonModel {
-  void login(String email, String password) {
-    _authenticatedUser = User(id: 'asasasas', email: email, password: password);
+   Future<Result> authenticate(String email, String password, [AuthMode mode = AuthMode.Login]) async {
+     showSpinner();
+
+    try {
+      ApiResult<Map<String, dynamic>> resp;
+      if(mode == AuthMode.Login)
+      {
+         resp = await AuthApi().login(email, password);
+      }
+      else
+      {
+         resp = await AuthApi().signup(email, password);
+      }
+
+      if (!resp.success) {
+        hideSpinner();
+        var errorMessage = resp.data['error']['message'];
+
+        if (errorMessage == 'EMAIL_EXISTS') {
+          return Result.fail('This email already exists.');
+        }
+        else if (errorMessage == 'EMAIL_NOT_FOUND' || errorMessage == 'INVALID_PASSWORD') {
+          return Result.fail('Invalid credentials.');
+        }
+       
+        return Result.fail('Invalid credentials.');
+      }
+
+      hideSpinner();
+      return Result.ok('Authentication succeeded');
+    } catch (err) {
+      hideSpinner();
+      return Result.fail('Please try again!');
+    }
   }
 }
 
@@ -89,7 +124,7 @@ class ProductsModel extends CommonModel {
     }
   }
 
-  Future<bool> addProduct(
+  Future<Result> addProduct(
       String title, String description, String image, double price) async {
     showSpinner();
     try {
@@ -97,7 +132,7 @@ class ProductsModel extends CommonModel {
           _authenticatedUser.id, title, description, image, price);
       if (!resp.success) {
         hideSpinner();
-        return false;
+        return Result.fail('Please try again!');
       }
 
       final Product newProduct = Product(
@@ -111,14 +146,14 @@ class ProductsModel extends CommonModel {
       _products.add(newProduct);
 
       hideSpinner();
-      return true;
+      return Result.ok();
     } catch (err) {
       hideSpinner();
-      return false;
+      return Result.fail('Please try again!');
     }
   }
 
-  Future<bool> updateProduct(
+  Future<Result> updateProduct(
       String title, String description, String image, double price) async {
     showSpinner();
     try {
@@ -132,7 +167,7 @@ class ProductsModel extends CommonModel {
           price);
       if (!resp.success) {
         hideSpinner();
-        return false;
+        return Result.fail('Please try again!');
       }
 
       final updatedProduct = Product(
@@ -145,14 +180,14 @@ class ProductsModel extends CommonModel {
           userId: selectedProduct.userId);
       _products[selectedProductIndex] = updatedProduct;
       hideSpinner();
-      return true;
+      return Result.ok();
     } catch (err) {
       hideSpinner();
-      return false;
+      return Result.fail('Please try again!');
     }
   }
 
-  Future<bool> deleteProduct() async {
+  Future<Result> deleteProduct() async {
     final deletedProductId = selectedProduct.id;
     _products.removeAt(selectedProductIndex);
     _selProductId = null;
@@ -161,13 +196,13 @@ class ProductsModel extends CommonModel {
       var resp = await ProductApi().delete(deletedProductId);
       if (!resp.success) {
         hideSpinner();
-        return false;
+        return Result.fail('Please try again!');
       }
       hideSpinner();
-      return true;
+      return Result.ok();
     } catch (err) {
       hideSpinner();
-      return false;
+      return Result.fail('Please try again!');
     }
   }
 
