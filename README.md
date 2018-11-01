@@ -52,6 +52,8 @@ assets
 fonts
 pages
 widgets
+models
+scoped-models
 ```
 11. In VS Code Press F5 to launch or type
 ```
@@ -94,15 +96,423 @@ final Function addProduct;
 ```
 * build()  must not return null but can return container()
 
-## main.dart with named routes
+## Firebase
+1. Create a new project using [Firebase](https://firebase.google.com/)
+2. Database > Create Realtime Database
+3. Start in test mode
+
+## Http Requests
+* (flutter http)[https://pub.dartlang.org/packages/http]
+1. Modify pubspec.yml
+```
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^0.1.2
+  http: ^0.11.3
+```
+2. Run the following command
+```
+flutter packages get
+```
+
+## /api/api-response.dart
+```
+class ApiResponse<T> 
+{
+  final bool success;
+  final T data;
+  final String body;
+
+  ApiResponse(this.success, this.body, this.data);
+}
+```
+
+## /api/product-api.dart
+```
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+
+import './api-response.dart';
+import '../models/product.dart';
+
+class ProductApi {
+  final String baseUrl = 'https://flutter-products-43c5c.firebaseio.com';
+
+    Future<ApiResponse<List<Product>>> fetchAll() async {    
+    var resp = await http.get(baseUrl + '/products.json');
+        
+    var apiResponse = _getResponseData(resp);
+
+    if(!apiResponse.success)
+    {
+      return ApiResponse<List<Product>>(false, apiResponse.body, null);
+    }
+
+    final List<Product> list = [];
+
+    if(apiResponse.data != null)
+    {
+      apiResponse.data.forEach((String id, dynamic item){
+            final Product newProduct = Product(
+            id : id, 
+            title:item['title'], 
+            description:item['description'], 
+            image:item['image'], 
+            price: item['price'],  
+            userEmail: item['userEmail'], 
+            userId: item['userId']);
+            list.add(newProduct);
+        });
+    }
+
+    return ApiResponse<List<Product>>(true, "", list);
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> add(String userEmail, String userId, String title, String description, String image, double price) async {
+    final Map<String, dynamic> payload = {
+      'title': title,
+      'description': description,
+      'image': 'https://moneyinc.com/wp-content/uploads/2017/07/Chocolate.jpg',
+      'price': price,
+      'userEmail': userEmail,
+      'userId': userId
+    };
+
+    var resp = await http.post(baseUrl + '/products.json', body: _getRequestData(payload));
+
+    var apiResponse = _getResponseData(resp);
+
+    return apiResponse;
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> update(String id, String userEmail, String userId, String title, String description, String image, double price) async {
+    final Map<String, dynamic> payload = {
+      'title': title,
+      'description': description,
+      'image': 'https://moneyinc.com/wp-content/uploads/2017/07/Chocolate.jpg',
+      'price': price,
+      'userEmail': userEmail,
+      'userId': userId
+    };
+
+    var resp = await http.put(baseUrl + '/products/$id.json', body: _getRequestData(payload));
+
+    var apiResponse = _getResponseData(resp);
+
+    return apiResponse;
+  }
+
+  Future<ApiResponse<Map<String, dynamic>>> delete(String id) async {
+    var resp = await http.delete(baseUrl + '/products/$id.json');
+
+    var apiResponse = _getResponseData(resp);
+
+   return apiResponse;
+  }
+
+  String _getRequestData(Object payload) {
+    return json.encode(payload);
+  }
+
+  ApiResponse<Map<String, dynamic>> _getResponseData(http.Response response) {
+     if(response.statusCode != 200 && response.statusCode != 201)
+    {
+      return ApiResponse(false, response.body, null);
+    }
+
+    final Map<String, dynamic> responseData = json.decode(response.body);
+    return ApiResponse(true,  response.body, responseData);
+  }
+}
+```
+
+
+## App State
+* (scoped model)https://pub.dartlang.org/packages/scoped_model
+1. Modify pubspec.yml
+```
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^0.1.2
+  scoped_model: ^0.3.0
+```
+2. Run the following command
+```
+flutter packages get
+```
+3. Use the following syntax to access state
+```
+ScopedModelDescendant<MainModel>(builder: (BuildContext context, Widget child, MainModel model){
+return ...
+})
+```
+
+## models\product.dart
+```
+import 'package:flutter/material.dart';
+
+//immutable
+class Product {
+  final String title;
+  final String description;
+  final double price;
+  final String image;
+  final bool isFavourite;
+
+  final String userEmail;
+  final String userId;
+
+  Product({
+    @required this.title, 
+    @required this.description, 
+    @required this.price, 
+    @required this.image,
+    @required this.userEmail,
+    @required this.userId,
+    this.isFavourite = false});
+}
+```
+
+## scoped-models\main.dart
+```
+import 'package:scoped_model/scoped_model.dart';
+
+import './common.dart';
+import './products.dart';
+import './user.dart';
+
+class MainModel extends Model with UserModel, ProductsModel {
+   
+
+}
+```
+
+## scoped-models\common.dart
+```
+import 'package:scoped_model/scoped_model.dart';
+
+import '../models/user.dart';
+import '../models/product.dart';
+
+import '../apis/product-api.dart';
+
+class CommonModel extends Model {
+  String _selProductId;
+  List<Product> _products = [];
+  User _authenticatedUser;
+  bool _isLoading = false;
+
+  void triggerRender() {
+    notifyListeners(); //triggers rerender like setState does
+  }
+
+  void showSpinner() {
+    _isLoading = true;
+    triggerRender();
+  }
+
+  void hideSpinner() {
+    _isLoading = false;
+    triggerRender();
+  }
+}
+
+class UtilityModel extends CommonModel {
+  bool get isLoading {
+    return _isLoading;
+  }
+}
+
+class UserModel extends CommonModel {
+  void login(String email, String password) {
+    _authenticatedUser = User(id: 'asasasas', email: email, password: password);
+  }
+}
+
+class ProductsModel extends CommonModel {
+  bool _showFavourites = false;
+
+  List<Product> get allProducts {
+    return List.from(_products);
+  }
+
+  List<Product> get displayedProducts {
+    if (_showFavourites) {
+      return List.from(_products.where((p) => p.isFavourite).toList());
+    }
+    return List.from(_products);
+  }
+
+  String get selectedProductId {
+    return _selProductId;
+  }
+
+  Product get selectedProduct {
+    if (_selProductId == null) {
+      return null;
+    }
+    return _products.firstWhere((p) => p.id == _selProductId);
+  }
+
+  bool get displayFavouritesOnly {
+    return _showFavourites;
+  }
+
+  int get selectedProductIndex {
+    return _products.indexWhere((p) => p.id == _selProductId);
+  }
+
+  Future<Null> fetchProducts() async {
+    showSpinner();
+    try {
+      var resp = await ProductApi().fetchAll();
+      if (!resp.success) {
+        hideSpinner();
+        return;
+      }
+      _products = resp.data;
+      hideSpinner();
+      _selProductId = null;
+      return;
+    } catch (err) {
+      hideSpinner();
+      return;
+    }
+  }
+
+  Future<bool> addProduct(
+      String title, String description, String image, double price) async {
+    showSpinner();
+    try {
+      var resp = await ProductApi().add(_authenticatedUser.email,
+          _authenticatedUser.id, title, description, image, price);
+      if (!resp.success) {
+        hideSpinner();
+        return false;
+      }
+
+      final Product newProduct = Product(
+          id: resp.data['name'].toString(),
+          title: title,
+          description: description,
+          image: image,
+          price: price,
+          userEmail: _authenticatedUser.email,
+          userId: _authenticatedUser.id);
+      _products.add(newProduct);
+
+      hideSpinner();
+      return true;
+    } catch (err) {
+      hideSpinner();
+      return false;
+    }
+  }
+
+  Future<bool> updateProduct(
+      String title, String description, String image, double price) async {
+    showSpinner();
+    try {
+      var resp = await ProductApi().update(
+          selectedProduct.id,
+          selectedProduct.userEmail,
+          selectedProduct.userId,
+          title,
+          description,
+          image,
+          price);
+      if (!resp.success) {
+        hideSpinner();
+        return false;
+      }
+
+      final updatedProduct = Product(
+          id: selectedProduct.id,
+          title: title,
+          description: description,
+          image: image,
+          price: price,
+          userEmail: selectedProduct.userEmail,
+          userId: selectedProduct.userId);
+      _products[selectedProductIndex] = updatedProduct;
+      hideSpinner();
+      return true;
+    } catch (err) {
+      hideSpinner();
+      return false;
+    }
+  }
+
+  Future<bool> deleteProduct() async {
+    final deletedProductId = selectedProduct.id;
+    _products.removeAt(selectedProductIndex);
+    _selProductId = null;
+    showSpinner();
+    try {
+      var resp = await ProductApi().delete(deletedProductId);
+      if (!resp.success) {
+        hideSpinner();
+        return false;
+      }
+      hideSpinner();
+      return true;
+    } catch (err) {
+      hideSpinner();
+      return false;
+    }
+  }
+
+  void toggleProductFavouriteStatus() {
+    final bool isCurrentlyFavourite = selectedProduct.isFavourite;
+    final bool newFavouriteStatus = !isCurrentlyFavourite;
+    final Product updatedProduct = Product(
+        id: selectedProduct.id,
+        title: selectedProduct.title,
+        description: selectedProduct.description,
+        price: selectedProduct.price,
+        image: selectedProduct.image,
+        userEmail: selectedProduct.userEmail,
+        userId: selectedProduct.userId,
+        isFavourite: newFavouriteStatus);
+    _products[selectedProductIndex] = updatedProduct;
+    triggerRender();
+  }
+
+  void selectProduct(String id) {
+    _selProductId = id;
+    triggerRender();
+  }
+
+  void toggleDisplayMode() {
+    _showFavourites = !_showFavourites;
+    triggerRender();
+  }
+}
+
+```
+
+## main.dart with state and named routes
+* Wrap MaterialApp with ScopedModel<MainModel>
 ```
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+
+import 'package:scoped_model/scoped_model.dart';
 
 import './pages/auth.dart';
 import './pages/products_admin.dart';
 import './pages/products.dart';
 import './pages/product.dart';
+
+import './scoped-models/main.dart';
 
 void main() {
   debugPaintSizeEnabled = false;
@@ -119,26 +529,13 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  List<Map<String, dynamic>> _products = [];
-
-  void _addProduct(Map<String, dynamic> product) {
-    setState(() {
-      _products.add(product);
-    });
-  }
-
-  void _deleteProduct(int index) {
-    setState(() {
-      _products.removeAt(index);
-    });
-  }
 
   dynamic staticRoutes() {
     return {
       '/': (BuildContext context) => AuthPage(),
-      '/products': (BuildContext context) => ProductsPage(_products),
+      '/products': (BuildContext context) => ProductsPage(),
       '/admin': (BuildContext context) =>
-          ProductsAdminPage(_addProduct, _deleteProduct)
+          ProductsAdminPage()
     };
   }
 
@@ -150,23 +547,22 @@ class _MyAppState extends State<MyApp> {
     if (pathElements[1] == 'product') {
       final int index = int.parse(pathElements[2]);
       return MaterialPageRoute<bool>(
-          builder: (BuildContext context) => ProductPage(
-              _products[index]['title'],
-                _products[index]['image'],
-                _products[index]['price'],
-                _products[index]['description']),);
+          builder: (BuildContext context) => ProductPage(index),);
     }
     return null;
   }
 
   Route<bool> unknownRouteHandler(RouteSettings settings) {
     return MaterialPageRoute(
-        builder: (BuildContext context) => ProductsPage(_products));
+        builder: (BuildContext context) => ProductsPage());
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return ScopedModel<MainModel>(
+      //one instance of model
+      model: MainModel(),
+      child: MaterialApp(
         //debugShowMaterialGrid: true,
         theme: ThemeData(
             //fontFamily: 'Oswald',
@@ -177,10 +573,170 @@ class _MyAppState extends State<MyApp> {
         //home: AuthPage(),
         routes: staticRoutes(),
         onGenerateRoute: dynamicRouteHandler,
-        onUnknownRoute: unknownRouteHandler);
+        onUnknownRoute: unknownRouteHandler));
+  }
+}
+```
+
+## pages\product_edit.dart
+```
+import 'package:flutter/material.dart';
+
+import 'package:scoped_model/scoped_model.dart';
+
+import '../models/product.dart';
+import '../scoped-models/products.dart';
+
+class ProductEditPage extends StatefulWidget {
+  @override
+  State<StatefulWidget> createState() {
+    return _ProductEditPageState();
   }
 }
 
+class _ProductEditPageState extends State<ProductEditPage> {
+  final Map<String, dynamic> _formData = {
+    'title': null,
+    'description': null,
+    'price': null,
+    'image': 'assets/food.jpg'
+  };
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
+  Widget _buildTitleTextField(Product product) {
+    return TextFormField(
+      decoration: InputDecoration(
+        labelText: 'Product Title',
+      ),
+      initialValue: product == null ? '' : product.title,
+      validator: (String value) {
+        if (value.isEmpty || value.length < 5) {
+          return "Title is required and should be 5+ characters long.";
+        }
+      },
+      onSaved: (String value) {
+        _formData['title'] = value;
+      },
+    );
+  }
+
+  Widget _buildDescriptionTextField(Product product) {
+    return TextFormField(
+      decoration: InputDecoration(
+        labelText: 'Product Description',
+      ),
+      initialValue: product == null ? '' : product.description,
+      validator: (String value) {
+        if (value.isEmpty || value.length < 10) {
+          return "Description is required and should be 10+ characters long.";
+        }
+      },
+      onSaved: (String value) {
+        _formData['description'] = value;
+      },
+      maxLines: 4,
+    );
+  }
+
+  Widget _buildProductPriceTextField(Product product) {
+    return TextFormField(
+      decoration: InputDecoration(
+        labelText: 'Product Price',
+      ),
+      initialValue:
+          product == null ? '' : product.price.toString(),
+      validator: (String value) {
+        if (value.isEmpty ||
+            !RegExp(r'^(?:[1-9]\d*|0)?(?:\.\d+)?$').hasMatch(value)) {
+          return "Price is required and should be a number.";
+        }
+      },
+      onSaved: (String value) {
+        //No need to call setState unless you want to rerender
+        // setState(() {
+        //   _priceValue = double.parse(value);
+        // });
+        _formData['price'] = double.parse(value);
+      },
+      keyboardType: TextInputType.number,
+    );
+  }
+
+  void _submitFormHandler(Function addProduct, Function updateProduct, [int selectedProductIndex]) {
+    if (!_formKey.currentState.validate()) {
+      return;
+    }
+
+    _formKey.currentState.save();
+
+    if (selectedProductIndex == null) {
+      addProduct(Product(
+          title: _formData['title'],
+          description: _formData['description'],
+          price: _formData['price'],
+          image: _formData['image']));
+    } else {
+      updateProduct(
+          Product(
+              title: _formData['title'],
+              description: _formData['description'],
+              price: _formData['price'],
+              image: _formData['image']));
+    }
+
+    Navigator.pushReplacementNamed(context, '/products');
+  }
+
+  Widget _buildSaveButton() {
+    return ScopedModelDescendant<ProductsModel>(
+        builder: (BuildContext context, Widget child, ProductsModel model) {
+      return RaisedButton(
+          child: Text('Save'),
+          textColor: Colors.white,
+          onPressed: () =>
+              _submitFormHandler(model.addProduct, model.updateProduct, model.selectedProductIndex));
+    });
+  }
+
+  Widget _buildPageContent(BuildContext context, Product product) {
+    final double deviceWidth = MediaQuery.of(context).size.width;
+    final targetWidth = deviceWidth > 550.0 ? 500.0 : deviceWidth * 0.95;
+    final targetPadding = deviceWidth - targetWidth;
+
+    return GestureDetector(
+        onTap: () {
+          //closes form when clicking somewhere
+          FocusScope.of(context).requestFocus(FocusNode());
+        },
+        child: Container(
+            margin: EdgeInsets.all(10.0),
+            child: Form(
+                key: _formKey,
+                child: ListView(
+                  padding: EdgeInsets.symmetric(horizontal: targetPadding / 2),
+                  children: <Widget>[
+                    _buildTitleTextField(product),
+                    _buildDescriptionTextField(product),
+                    _buildProductPriceTextField(product),
+                    SizedBox(height: 10.0),
+                    _buildSaveButton()
+                  ],
+                ))));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ScopedModelDescendant<ProductsModel>(
+        builder: (BuildContext context, Widget child, ProductsModel model) {
+      final Widget pageContent = _buildPageContent(context, model.selectedProduct);
+
+      return model.selectedProductIndex == null
+          ? pageContent
+          : Scaffold(
+              appBar: AppBar(title: Text('Edit Product')), body: pageContent);
+    });
+  }
+}
 ```
 
 ## Stateless Widget
@@ -237,6 +793,15 @@ class ProductCard extends StatelessWidget {
 5. Use the image with the following syntax
 ```
 Image.asset('assets/food.jpg')
+AssetImage(product.image)
+Image.network('https://moneyinc.com/wp-content/uploads/2017/07/Chocolate.jpg')
+NetworkImage(product.image)
+
+ FadeInImage(
+        image: NetworkImage(product.image), 
+        height: 300.0,
+        fit: BoxFit.cover,
+      placeholder: AssetImage('assets/food.jpg'))
 ```
 
 ## Fonts
@@ -254,6 +819,17 @@ Image.asset('assets/food.jpg')
 5. Use the font with the following syntax
 ```
 Text(products[index]['title'], style: TextStyle(fontSize: 26.0, fontWeight: FontWeight.bold, fontFamily: 'Oswald'))
+```
+
+## Loading Indicator
+```
+Center(child: CircularProgressIndicator())
+```
+
+## Pull Down Refresh
+* Ensure the onRefresh method returns a Future
+```
+RefreshIndicator(onRefresh:(){model.fetchProducts();}, child: content);
 ```
 
 ## List View

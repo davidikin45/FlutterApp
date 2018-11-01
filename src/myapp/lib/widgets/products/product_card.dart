@@ -1,43 +1,53 @@
 import 'package:flutter/material.dart';
 
+import 'package:scoped_model/scoped_model.dart';
+
 import './price_tag.dart';
 import './address_tag.dart';
 import '../ui_elements/title_default.dart';
+import '../../models/product.dart';
+import '../../scoped-models/main.dart';
 
 class ProductCard extends StatelessWidget {
-  final Map<String, dynamic> product;
+  final Product product;
   final int productIndex;
 
   ProductCard(this.product, this.productIndex);
 
-  Widget _buildTitlePriceRow()
-  {
+  Widget _buildTitlePriceRow() {
     return Container(
-        padding: EdgeInsets.only(top: 10.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-              TitleDefault(product['title']),
-            SizedBox(width: 8.0),
-            PriceTag(product['price'].toString())
-          ],
-        ),
-      );
+      padding: EdgeInsets.only(top: 10.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          TitleDefault(product.title),
+          SizedBox(width: 8.0),
+          PriceTag(product.price.toString())
+        ],
+      ),
+    );
   }
 
-  Widget _buildActionButtons(BuildContext context)
-  {
-    return ButtonBar(alignment: MainAxisAlignment.center, children: <Widget>[
+  Widget _buildActionButtons(BuildContext context) {
+    return ScopedModelDescendant<MainModel>(
+        builder: (BuildContext context, Widget child, MainModel model) {
+      return ButtonBar(alignment: MainAxisAlignment.center, children: <Widget>[
         IconButton(
             icon: Icon(Icons.info),
             color: Theme.of(context).accentColor,
             onPressed: () => Navigator.pushNamed<bool>(
-                context, '/product/' + productIndex.toString())),
+                context, '/product/' + model.allProducts[productIndex].id)),
         IconButton(
             color: Colors.red,
-            icon: Icon(Icons.favorite_border),
-            onPressed: () {})
+            icon: Icon(model.allProducts[productIndex].isFavourite
+                ? Icons.favorite
+                : Icons.favorite_border),
+            onPressed: () {
+              model.selectProduct(model.allProducts[productIndex].id);
+              model.toggleProductFavouriteStatus();
+            })
       ]);
+    });
   }
 
   @override
@@ -45,9 +55,15 @@ class ProductCard extends StatelessWidget {
     // TODO: implement build
     return Card(
         child: Column(children: <Widget>[
-      Image.asset(product['image']),
+      //Image.asset(product.image),
+      FadeInImage(
+          image: NetworkImage(product.image),
+          height: 300.0,
+          fit: BoxFit.cover,
+          placeholder: AssetImage('assets/food.jpg')),
       _buildTitlePriceRow(),
       AddressTag('Union Square, San Francisco'),
+      Text(product.userEmail),
       _buildActionButtons(context)
     ]));
   }
