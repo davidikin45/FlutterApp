@@ -12,6 +12,10 @@ class Product {
   final String userEmail;
   final String userId;
 
+  final String locAddress;
+  final double locLat;
+  final double locLng;
+
   Product({
     @required this.id, 
     @required this.title, 
@@ -20,5 +24,8 @@ class Product {
     @required this.image,
     @required this.userEmail,
     @required this.userId,
+    @required this.locAddress,
+    @required this.locLat,
+    @required this.locLng,
     this.isFavourite = false});
 }

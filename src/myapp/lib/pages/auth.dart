@@ -120,7 +120,7 @@ class _AuthPageState extends State<AuthPage> {
       Result result = await authenticate(_formData['email'], _formData['password'], _authMode);
 
      if (result.success) {
-        Navigator.pushReplacementNamed(context, '/products');
+        //Navigator.pushReplacementNamed(context, '/');
       }
       else
       {

@@ -123,8 +123,12 @@ https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key=[A
 ```
 
 
-## Http Requests
+## Http Requests, Shared preferences, Rx Dart, Map View, Location
 * (flutter http)[https://pub.dartlang.org/packages/http]
+* (Shared Preferences)[https://pub.dartlang.org/packages/shared_preferences]
+* (Rx Dart)[https://pub.dartlang.org/packages/rxdart]
+* (Map View)[https://pub.dartlang.org/packages/map_view]
+* (Location)[https://pub.dartlang.org/packages/location]
 1. Modify pubspec.yml
 ```
 dependencies:
@@ -135,10 +139,84 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^0.1.2
   http: ^0.11.3
+  shared_preferences: ^0.4.3
+  map_view: ^0.0.14
+  location: ^1.4.1
 ```
 2. Run the following command
 ```
 flutter packages get
+```
+3. Go to: https://console.developers.google.com/
+4. Enable Maps SDK for Android
+5. Enable Maps SDK for iOS
+6. Enable Maps for Static Api
+7. Enable Geocoding API
+8. Under Credentials, choose Create Credential.
+9. AndroidMainfest.xml
+```
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.myapp">
+
+    <!-- The INTERNET permission is required for development. Specifically,
+         flutter needs it to communicate with the running application
+         to allow setting breakpoints, to provide hot reload, etc.
+    -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+
+    <!-- io.flutter.app.FlutterApplication is an android.app.Application that
+         calls FlutterMain.startInitialization(this); in its onCreate method.
+         In most cases you can leave this as-is, but you if you want to provide
+         additional functionality it is fine to subclass or reimplement
+         FlutterApplication and put your custom class here. -->
+    <application
+        android:name="io.flutter.app.FlutterApplication"
+        android:label="myapp"
+        android:icon="@mipmap/ic_launcher">
+        <activity
+            android:name=".MainActivity"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|layoutDirection|fontScale|screenLayout|density"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <!-- This keeps the window background of the activity showing
+                 until Flutter renders its first frame. It can be removed if
+                 there is no splash screen (such as the default splash screen
+                 defined in @style/LaunchTheme). -->
+            <meta-data
+                android:name="io.flutter.app.android.SplashScreenUntilFirstFrame"
+                android:value="true" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <activity android:name="com.apptreesoftware.mapview.MapActivity" android:theme="@style/Theme.AppCompat.Light.DarkActionBar"/>
+        <meta-data android:name="com.google.android.maps.v2.API_KEY" android:value=""/>
+        <meta-data android:name="com.google.android.gms.version" android:value="@integer/google_play_services_version"/>
+    </application>
+</manifest>
+```
+10. android\build.gradle
+```
+dependencies {
+        classpath 'com.android.tools.build:gradle:3.1.2'
+        classpath 'org.jetbrains.kotlin:kotlin-gradle-plugin:1.1.2-4'
+    }
+
+subprojects {
+    project.configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'com.android.support'
+                    && !details.requested.name.contains('multidex') ) {
+                details.useVersion "26.1.0"
+            }
+        }
+    }
+}
 ```
 
 ## /shared/result.dart
@@ -147,9 +225,9 @@ import 'package:flutter/material.dart';
 
 class ApiResult<T> extends DataResult<T>
 {
-  final String body;
+  final Map<String, dynamic> json;
 
-  ApiResult({@required bool success, @required T data, @required this.body, String message = ''}) : super(success:success,data: data, message:message);
+  ApiResult({@required bool success, @required T data, @required this.json, String message = ''}) : super(success:success,data: data, message:message);
 }
 
 class DataResult<T> extends Result
@@ -184,14 +262,14 @@ class Result
     return DataResult<T>(success: false, data: null, message: errorMessage);
   }
 
-  static ApiResult<T> okApi<T>(T data, String body, [String successMessage = ''])
+  static ApiResult<T> okApi<T>(T data, Map<String, dynamic> json, [String successMessage = ''])
   {
-    return ApiResult<T>(success: true,data: data, body:body, message: null);
+    return ApiResult<T>(success: true,data: data, json:json, message: null);
   }
 
-  static ApiResult<T> failApi<T>(T data, String body, String errorMessage)
+  static ApiResult<T> failApi<T>(T data, Map<String, dynamic> json, String errorMessage)
   {
-    return ApiResult<T>(success: false, data: data, body:body, message: errorMessage);
+    return ApiResult<T>(success: false, data: data, json:json, message: errorMessage);
   }
 
   Result({@required this.success, this.message = ''});
@@ -224,73 +302,79 @@ abstract class ApiBase {
 
 ## /apis/product.dart
 ```
-import 'package:http/http.dart' as http;
+iimport 'package:http/http.dart' as http;
 import './base.dart';
 
 import '../shared/result.dart';
-import '../models/product.dart';
+import '../dtos/product.dart';
 
 class ProductApi extends ApiBase {
   final String baseUrl = 'https://flutter-products-43c5c.firebaseio.com';
 
-    Future<ApiResult<List<Product>>> fetchAll() async {    
-    var resp = await http.get(baseUrl + '/products.json');
-        
-    var apiResponse = getResponseData(resp);
-
-    if(!apiResponse.success)
-    {
-      return Result.failApi<List<Product>>(apiResponse.errorMessage, apiResponse.body);
-    }
-
-    final List<Product> list = [];
-
-    if(apiResponse.data != null)
-    {
-      apiResponse.data.forEach((String id, dynamic item){
-            final Product newProduct = Product(
-            id : id, 
-            title:item['title'], 
-            description:item['description'], 
-            image:item['image'], 
-            price: item['price'],  
-            userEmail: item['userEmail'], 
-            userId: item['userId']);
-            list.add(newProduct);
-        });
-    }
-
-   return Result.okApi(list, apiResponse.body);
-  }
-
-  Future<ApiResult<Map<String, dynamic>>> add(String userEmail, String userId, String title, String description, String image, double price) async {
-    final Map<String, dynamic> payload = {
-      'title': title,
-      'description': description,
-      'image': 'https://moneyinc.com/wp-content/uploads/2017/07/Chocolate.jpg',
-      'price': price,
-      'userEmail': userEmail,
-      'userId': userId
-    };
-
-    var resp = await http.post(baseUrl + '/products.json', body: getRequestData(payload));
+  Future<ApiResult<List<ProductDto>>> fetchAll() async {
+    var resp = await http.get('$baseUrl/products.json');
 
     var apiResponse = getResponseData(resp);
 
-    return apiResponse;
+    if (!apiResponse.success) {
+      return Result.failApi<List<ProductDto>>(
+          null, apiResponse.json, apiResponse.message);
+    }
+
+    final List<ProductDto> list = [];
+
+    if (apiResponse.data != null) {
+      apiResponse.data.forEach((String id, dynamic item) {
+        final ProductDto newProduct = ProductDto.fromDynamic(id, item);
+        list.add(newProduct);
+      });
+    }
+
+    return Result.okApi(list, apiResponse.json);
   }
 
-  Future<ApiResult<Map<String, dynamic>>> update(String id, String userEmail, String userId, String title, String description, String image, double price) async {
-    final Map<String, dynamic> payload = {
-      'title': title,
-      'description': description,
-      'image': 'https://moneyinc.com/wp-content/uploads/2017/07/Chocolate.jpg',
-      'price': price,
-      'userEmail': userEmail,
-      'userId': userId
-    };
+  Future<ApiResult<String>> add(String userEmail, String userId, String title,
+      String description, String image, double price) async {
+    final payload = ProductDto(
+        title: title,
+        description: description,
+        image: 'https://moneyinc.com/wp-content/uploads/2017/07/Chocolate.jpg',
+        price: price,
+        userEmail: userEmail,
+        userId: userId);
 
-    var resp = await http.put(baseUrl + '/products/$id.json', body: getRequestData(payload));
+    var resp = await http.post('$baseUrl/products.json',
+        body: getRequestBody(payload));
+
+    var apiResponse = getResponseData(resp);
+
+    if (!apiResponse.success) {
+      return Result.failApi<String>(
+          null, apiResponse.json, apiResponse.message);
+    }
+
+    String id = apiResponse.json['name'];
+    return Result.okApi(id, apiResponse.json);
+  }
+
+  Future<ApiResult<Map<String, dynamic>>> update(
+      String id,
+      String userEmail,
+      String userId,
+      String title,
+      String description,
+      String image,
+      double price) async {
+    final payload = ProductDto(
+        title: title,
+        description: description,
+        image: 'https://moneyinc.com/wp-content/uploads/2017/07/Chocolate.jpg',
+        price: price,
+        userEmail: userEmail,
+        userId: userId);
+
+    var resp = await http.put('$baseUrl/products/$id.json',
+        body: getRequestBody(payload));
 
     var apiResponse = getResponseData(resp);
 
@@ -298,51 +382,184 @@ class ProductApi extends ApiBase {
   }
 
   Future<ApiResult<Map<String, dynamic>>> delete(String id) async {
-    var resp = await http.delete(baseUrl + '/products/$id.json');
+    var resp = await http.delete('$baseUrl/products/$id.json');
 
     var apiResponse = getResponseData(resp);
 
-   return apiResponse;
+    return apiResponse;
   }
 }
 ```
+
+## /dtos/product.dart
+```
+import 'package:flutter/material.dart';
+
+//immutable
+class ProductDto {
+  final String id;
+  final String title;
+  final String description;
+  final double price;
+  final String image;
+
+  final String userEmail;
+  final String userId;
+
+  ProductDto(
+      {this.id,
+      @required this.title,
+      @required this.description,
+      @required this.price,
+      @required this.image,
+      @required this.userEmail,
+      @required this.userId});
+
+  factory ProductDto.fromDynamic(String id, dynamic json) {
+    return ProductDto(
+      id: id,
+      title: json['title'],
+      description: json['description'],
+      price: json['price'],
+      image: json['image'],
+      userEmail: json['userEmail'],
+      userId: json['userId'],
+    );
+  }
+
+   Map<String, dynamic> toJson() => {
+        'title': title,
+        'description': description,
+        'price': price,
+        'image': image,
+        'userEmail': userEmail,
+        'userId': userId,
+      };
+}
+```
+
+## /dtos/firebase.dart
+```
+import 'package:flutter/material.dart';
+
+class AuthenticationRequestDto {
+  final String email;
+  final String password;
+  final bool returnSecureToken;
+
+  AuthenticationRequestDto(
+      {@required this.email,
+      @required this.password,
+      this.returnSecureToken = true});
+
+  Map<String, dynamic> toJson() => {
+        'email': email,
+        'password': password,
+        'returnSecureToken': returnSecureToken
+      };
+}
+
+class LoginResponseDto {
+  final String kind;
+  final String idToken;
+  final String refreshToken;
+  final String expiresIn;
+
+  LoginResponseDto(
+      {@required this.kind,
+      @required this.idToken,
+      @required this.refreshToken,
+      @required this.expiresIn});
+
+  factory LoginResponseDto.fromJson(Map<String, dynamic> json) {
+    return LoginResponseDto(
+        kind: json['kind'],
+        idToken: json['idToken'],
+        refreshToken: json['refreshToken'],
+        expiresIn: json['expiresIn']);
+  }
+}
+
+class SignupResponseDto {
+  final String kind;
+  final String idToken;
+  final String email;
+  final String refreshToken;
+  final String expiresIn;
+  final String localId;
+
+  SignupResponseDto(
+      {@required this.kind,
+      @required this.idToken,
+      @required this.email,
+      @required this.refreshToken,
+      @required this.expiresIn,
+      @required this.localId});
+
+  factory SignupResponseDto.fromJson(Map<String, dynamic> json) {
+    return SignupResponseDto(
+        kind: json['kind'],
+        idToken: json['idToken'],
+        email: json['email'],
+        refreshToken: json['refreshToken'],
+        expiresIn: json['expiresIn'],
+        localId: json['localId']);
+  }
+}
+```
+
 ## /apis/auth.dart
 ```
 import 'package:http/http.dart' as http;
 import './base.dart';
 
 import '../shared/result.dart';
+import '../dtos/firebase.dart';
 
 class AuthApi extends ApiBase {
   final String apiKey = 'AIzaSyBezaAajSgJS53o2YnVH72MYKA8rW1QNR0';
   final String baseUrl = 'https://www.googleapis.com/identitytoolkit/v3/relyingparty';
 
-  Future<ApiResult<Map<String, dynamic>>> signup(String email, String password) async {
-    final Map<String, dynamic> payload = {
-      'email': email,
-      'password': password,
-      'returnSecureToken': true
-    };
+  Future<ApiResult<SignupResponseDto>> signup(String email, String password) async {
+    final payload = AuthenticationRequestDto (
+      email: email,
+      password: password,
+      returnSecureToken: true
+    );
 
-    var resp = await http.post('$baseUrl/signupNewUser?key=$apiKey', body: getRequestBody(payload), headers: {'Content-Type:': 'application/json'});
+    var resp = await http.post('$baseUrl/signupNewUser?key=$apiKey', body: getRequestBody(payload));
 
     var apiResponse = getResponseData(resp);
 
-    return apiResponse;
+    if(!apiResponse.success)
+    {
+      return Result.failApi<SignupResponseDto>(null, apiResponse.json, apiResponse.message);
+    }
+
+    var dto = SignupResponseDto.fromJson(apiResponse.json);
+
+    return Result.okApi(dto, apiResponse.json);
   }
 
-  Future<ApiResult<Map<String, dynamic>>> login(String email, String password) async {
-     final Map<String, dynamic> payload = {
-      'email': email,
-      'password': password,
-      'returnSecureToken': true
-    };
+  Future<ApiResult<LoginResponseDto>> login(String email, String password) async {
+     final payload = AuthenticationRequestDto (
+      email: email,
+      password: password,
+      returnSecureToken: true
+    );
 
-    var resp = await http.post('$baseUrl/verifyPassword?key=$apiKey', body: getRequestBody(payload), headers: {'Content-Type:': 'application/json'});
+    var resp = await http.post('$baseUrl/verifyPassword?key=$apiKey', body: getRequestBody(payload));
 
     var apiResponse = getResponseData(resp);
 
-    return apiResponse;
+    if(!apiResponse.success)
+    {
+      return Result.failApi<LoginResponseDto>(null, apiResponse.json, apiResponse.message);
+    }
+
+    var dto = LoginResponseDto.fromJson(apiResponse.json);
+
+    return Result.okApi(dto, apiResponse.json);
   }
 }
 ```

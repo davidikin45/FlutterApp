@@ -6,6 +6,9 @@ import '../shared/result.dart';
 import '../models/product.dart';
 import '../scoped-models/main.dart';
 
+import '../widgets/form_inputs/location.dart';
+import '../dtos/google.dart';
+
 class ProductEditPage extends StatefulWidget {
   @override
   State<StatefulWidget> createState() {
@@ -18,16 +21,38 @@ class _ProductEditPageState extends State<ProductEditPage> {
     'title': null,
     'description': null,
     'price': null,
-    'image': 'assets/food.jpg'
+    'image': 'assets/food.jpg',
+    'location': null
   };
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final _titleTextController = TextEditingController();
 
   Widget _buildTitleTextField(Product product) {
+    if(product == null && _titleTextController.text.trim() == '')
+    {
+       _titleTextController.text = '';
+    } else if(product != null && _titleTextController.text.trim() == '')
+    {
+        _titleTextController.text = product.title;
+    }
+    else if(product != null && _titleTextController.text.trim() != '')
+    {
+        _titleTextController.text =  _titleTextController.text;
+    } else  if(product == null && _titleTextController.text.trim() != '')
+    {
+        _titleTextController.text =  _titleTextController.text;
+    }
+    else
+    {
+        _titleTextController.text = '';
+    }
+ 
     return TextFormField(
       decoration: InputDecoration(
         labelText: 'Product Title',
       ),
-      initialValue: product == null ? '' : product.title,
+      controller: _titleTextController,
+      //initialValue: product == null ? '' : product.title,
       validator: (String value) {
         if (value.isEmpty || value.length < 5) {
           return "Title is required and should be 5+ characters long.";
@@ -97,6 +122,10 @@ class _ProductEditPageState extends State<ProductEditPage> {
               });
   }
 
+  void _setLocation(GeocodingResult result){
+    _formData['location'] = result;
+  }
+
   void _submitFormHandler(
       Function addProduct, Function updateProduct, Function setSelectedProduct,
       [int selectedProductIndex]) {
@@ -107,8 +136,8 @@ class _ProductEditPageState extends State<ProductEditPage> {
     _formKey.currentState.save();
 
     if (selectedProductIndex == -1) {
-      addProduct(_formData['title'], _formData['description'],
-              _formData['image'], _formData['price'])
+      addProduct(_titleTextController.text, _formData['description'],
+              _formData['image'], _formData['price'], _formData['location'])
           .then((Result result) {
         if (result.success) {
           Navigator.pushReplacementNamed(context, '/products')
@@ -118,8 +147,8 @@ class _ProductEditPageState extends State<ProductEditPage> {
         }
       });
     } else {
-      updateProduct(_formData['title'], _formData['description'],
-              _formData['image'], _formData['price'])
+      updateProduct(_titleTextController.text, _formData['description'],
+              _formData['image'], _formData['price'], _formData['location'])
         .then((Result result) {
         if (result.success) {
           Navigator.pushReplacementNamed(context, '/products')
@@ -167,6 +196,8 @@ class _ProductEditPageState extends State<ProductEditPage> {
                     _buildTitleTextField(product),
                     _buildDescriptionTextField(product),
                     _buildProductPriceTextField(product),
+                    SizedBox(height: 10.0),
+                    LocationInput(_setLocation, product),
                     SizedBox(height: 10.0),
                     _buildSaveButton()
                   ],

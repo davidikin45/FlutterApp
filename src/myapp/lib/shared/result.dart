@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 
 class ApiResult<T> extends DataResult<T>
 {
-  final String body;
+  final Map<String, dynamic> json;
 
-  ApiResult({@required bool success, @required T data, @required this.body, String message = ''}) : super(success:success,data: data, message:message);
+  ApiResult({@required bool success, @required T data, @required this.json, String message = ''}) : super(success:success,data: data, message:message);
 }
 
 class DataResult<T> extends Result
@@ -39,14 +39,14 @@ class Result
     return DataResult<T>(success: false, data: null, message: errorMessage);
   }
 
-  static ApiResult<T> okApi<T>(T data, String body, [String successMessage = ''])
+  static ApiResult<T> okApi<T>(T data, Map<String, dynamic> json, [String successMessage = ''])
   {
-    return ApiResult<T>(success: true,data: data, body:body, message: null);
+    return ApiResult<T>(success: true,data: data, json:json, message: null);
   }
 
-  static ApiResult<T> failApi<T>(T data, String body, String errorMessage)
+  static ApiResult<T> failApi<T>(T data, Map<String, dynamic> json, String errorMessage)
   {
-    return ApiResult<T>(success: false, data: data, body:body, message: errorMessage);
+    return ApiResult<T>(success: false, data: data, json:json, message: errorMessage);
   }
 
   Result({@required this.success, this.message = ''});

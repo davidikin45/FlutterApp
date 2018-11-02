@@ -23,7 +23,7 @@ class _ProductListPageState extends State<ProductListPage>{
   @override
   initState()
   {
-    widget.model.fetchProducts();
+    widget.model.fetchProducts(onlyForUser: true);
     super.initState();
   }
 
@@ -61,7 +61,9 @@ class _ProductListPageState extends State<ProductListPage>{
               Navigator.of(context)
                   .push(MaterialPageRoute(builder: (BuildContext context) {
                 return ProductEditPage();
-              }));
+              })).then((_){
+                model.selectProduct(null);
+              });
             });
   }
 

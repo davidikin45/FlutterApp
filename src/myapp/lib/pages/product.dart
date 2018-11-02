@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:scoped_model/scoped_model.dart';
 
-import '../scoped-models/main.dart';
+import 'package:map_view/map_view.dart';
 
 import '../widgets/ui_elements/title_default.dart';
 import '../models/product.dart';
@@ -12,14 +11,41 @@ class ProductPage extends StatelessWidget {
 
   ProductPage(this.product);
 
-  Widget _buildAddressPriceRow(double price) {
+  void _showMap() {
+    final List<Marker> markers = <Marker>[
+      Marker('position', 'Position', product.locLat, product.locLng)
+    ];
+    final cameraPosition =
+        CameraPosition(Location(product.locLat, product.locLng), 14.0);
+    final mapView = MapView();
+    mapView.show(
+        MapOptions(
+            initialCameraPosition: cameraPosition,
+            mapViewType: MapViewType.normal,
+            title: 'Product Location'),
+        toolbarActions: [ToolbarAction('Close', 1)]);
+
+        mapView.onToolbarAction.listen((int id){
+            if(id == 1)
+            {
+              mapView.dismiss();
+            }
+        });
+        mapView.onMapReady.listen((_){
+          mapView.setMarkers(markers);
+        });
+  }
+
+  Widget _buildAddressPriceRow(String address, double price) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
-        Text(
-          'Union Square, San Francisco',
-          style: TextStyle(fontFamily: 'Oswald', color: Colors.grey),
-        ),
+        GestureDetector(
+            onTap: _showMap,
+            child: Text(
+              address,
+              style: TextStyle(fontFamily: 'Oswald', color: Colors.grey),
+            )),
         Container(
           margin: EdgeInsets.symmetric(horizontal: 5.0),
           child: Text(
@@ -60,7 +86,7 @@ class ProductPage extends StatelessWidget {
                 padding: EdgeInsets.all(10.0),
                 child: TitleDefault(product.title),
               ),
-              _buildAddressPriceRow(product.price),
+              _buildAddressPriceRow(product.locAddress, product.price),
               Container(
                 padding: EdgeInsets.all(10.0),
                 child: Text(
