@@ -17,7 +17,7 @@ class GeocodingApi extends ApiBase {
 
     var resp = await http.get(uri);
 
-    var apiResponse = getResponseData(resp);
+    var apiResponse = getResponseAsJson(resp);
 
     if(!apiResponse.success)
     {
@@ -34,7 +34,7 @@ class GeocodingApi extends ApiBase {
 
     var resp = await http.get(uri);
 
-    var apiResponse = getResponseData(resp);
+    var apiResponse = getResponseAsJson(resp);
 
     if(!apiResponse.success)
     {

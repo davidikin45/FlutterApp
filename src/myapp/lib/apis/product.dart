@@ -14,7 +14,7 @@ class ProductApi extends ApiBase {
   Future<ApiResult<List<ProductDto>>> fetchAll() async {
     var resp = await http.get('$baseUrl/$tableName.json?auth=$token');
 
-    var apiResponse = getResponseData(resp);
+    var apiResponse = getResponseAsJson(resp);
 
     if (!apiResponse.success) {
       return Result.failApi<List<ProductDto>>(
@@ -38,7 +38,7 @@ class ProductApi extends ApiBase {
     var resp = await http.post('$baseUrl/$tableName.json?auth=$token',
         body: getRequestBody(payload));
 
-    var apiResponse = getResponseData(resp);
+    var apiResponse = getResponseAsJson(resp);
 
     if (!apiResponse.success) {
       return Result.failApi<String>(
@@ -56,16 +56,16 @@ class ProductApi extends ApiBase {
     var resp = await http.put('$baseUrl/$tableName/$id.json?auth=$token',
         body: getRequestBody(payload));
 
-    var apiResponse = getResponseData(resp);
+    var apiResponse = getResponseAsJson(resp);
 
     return apiResponse;
   }
 
-  Future<ApiResult<Map<String, dynamic>>> setAsFavourite(String id, String userId) async {
-
+  Future<ApiResult<bool>> setAsFavourite(String id, String userId) async {
+    //firebase put returns whatever you send
     var resp = await http.put('$baseUrl/$tableName/$id/wishListUsers/$userId.json?auth=$token', body: getRequestBody(true));
 
-    var apiResponse = getResponseData(resp);
+    var apiResponse = getResponseAsBoolean(resp);
 
     return apiResponse;
   }
@@ -74,7 +74,7 @@ class ProductApi extends ApiBase {
 
     var resp = await http.delete('$baseUrl/$tableName/$id/wishListUsers/$userId.json?auth=$token');
 
-    var apiResponse = getResponseData(resp);
+    var apiResponse = getResponseAsJson(resp);
 
     return apiResponse;
   }
@@ -82,7 +82,7 @@ class ProductApi extends ApiBase {
   Future<ApiResult<Map<String, dynamic>>> delete(String id) async {
     var resp = await http.delete('$baseUrl/$tableName/$id.json?auth=$token');
 
-    var apiResponse = getResponseData(resp);
+    var apiResponse = getResponseAsJson(resp);
 
     return apiResponse;
   }

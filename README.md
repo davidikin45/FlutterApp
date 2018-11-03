@@ -59,6 +59,11 @@ scoped-models
 ```
 flutter run
 ```
+## Analyzing Code
+1. Run the following command
+```
+flutter analyze
+```
 
 ## Useful notes
 * [Learn Dart](https://www.dartlang.org/)
@@ -96,7 +101,7 @@ final Function addProduct;
 ```
 * build()  must not return null but can return container()
 
-## Firebase
+## Firebase Db
 1. Create a new project using [Firebase](https://firebase.google.com/)
 2. Database > Create Realtime Database
 3. Start in test mode
@@ -121,14 +126,162 @@ https://www.googleapis.com/identitytoolkit/v3/relyingparty/verifyPassword?key=[A
   }
 }
 ```
+## Firebase Image Storage
+1. Storage >  Get Started
+2. Functions >  Get Started
+3. Install  
+```
+npm install -g firebase-tools
+```
+4. Run the following command
+```
+cd myapp
+firebase login
+firebase init
+```
+5. Use arrows to select Functions and press space and then enter
+6. Select project and press enter
+7. Select JavaScript as language
+8. Enter n for ESLint
+9. Enter y for installing dependencies
+10. Add node_modules to .gitignore
+11. Enable Google Cloud Storage API
+12. Create a service key
+13. Set auth environnment var
+```
+set GOOGLE_APPLICATION_CREDENTIALS="C:\keys\Flutter Products-8b49c1dd428e.json"
+```
+14. Install dependencies
+```
+npm install --save cors
+npm install --save busboy
+npm install --save uuid
+npm install --save @google-cloud/storage
+npm install --save firebase-admin
+```
+15. cog > Project settings > Service accounts > Generate new private key > Generate key
+16. Save file in myapp\functions\{projectid}.json
+17. functions\index.js
+```
+const functions = require('firebase-functions');
+const cors = require('cors')({ origin: true });
+const Busboy = require('busboy');
+const os = require('os');
+const path = require('path');
+const fs = require('fs');
+const fbAdmin = require('firebase-admin');
+const uuid = require('uuid/v4');
 
+const gcconfig = {
+  projectId: 'flutter-products-43c5c',
+  keyFilename: 'flutter-products-43c5c.json'
+};
 
-## Http Requests, Shared preferences, Rx Dart, Map View, Location
+const {Storage} = require('@google-cloud/storage');
+
+const gcs = new Storage(gcconfig);
+
+fbAdmin.initializeApp({
+  credential: fbAdmin.credential.cert(require('./flutter-products-43c5c.json'))
+});
+
+exports.storeImage = functions.https.onRequest((req, res) => {
+  return cors(req, res, () => {
+    if (req.method !== 'POST') {
+      return res.status(500).json({ message: 'Not allowed.' });
+    }
+
+    if (
+      !req.headers.authorization ||
+      !req.headers.authorization.startsWith('Bearer ')
+    ) {
+      return res.status(401).json({ error: 'Unauthorized.' });
+    }
+
+    let idToken;
+    idToken = req.headers.authorization.split('Bearer ')[1];
+
+    const busboy = new Busboy({ headers: req.headers });
+    let uploadData;
+    let oldImagePath;
+
+    busboy.on('file', (fieldname, file, filename, encoding, mimetype) => {
+      const filePath = path.join(os.tmpdir(), filename);
+      uploadData = { filePath: filePath, type: mimetype, name: filename };
+      file.pipe(fs.createWriteStream(filePath));
+    });
+
+    busboy.on('field', (fieldname, value) => {
+      oldImagePath = decodeURIComponent(value);
+    });
+
+    busboy.on('finish', () => {
+      const bucket = gcs.bucket('flutter-products-43c5c.appspot.com');
+      const id = uuid();
+      let imagePath = 'images/' + id + '-' + uploadData.name;
+      if (oldImagePath) {
+        imagePath = oldImagePath;
+      }
+
+      return fbAdmin
+        .auth()
+        .verifyIdToken(idToken)
+        .then(decodedToken => {
+          return bucket.upload(uploadData.filePath, {
+            uploadType: 'media',
+            destination: imagePath,
+            metadata: {
+              metadata: {
+                contentType: uploadData.type,
+                firebaseStorageDownloadTokens: id
+              }
+            }
+          });
+        })
+        .then(() => {
+          return res.status(201).json({
+            imageUrl:
+              'https://firebasestorage.googleapis.com/v0/b/' +
+              bucket.name +
+              '/o/' +
+              encodeURIComponent(imagePath) +
+              '?alt=media&token=' +
+              id,
+            imagePath: imagePath
+          });
+        })
+        .catch(error => {
+          return res.status(401).json({ error: 'Unauthorized!' });
+        });
+    });  
+    return busboy.end(req.rawBody);
+  });
+});
+
+exports.deleteImage = functions.database.ref('/products/{productId}').onDelete(snapshot => {
+  const imageData = snapshot.val();
+  const imagePath = imageData.imagePath;
+
+   const bucket = gcs.bucket('flutter-products-43c5c.appspot.com');
+   return bucket.file(imagePath).delete();
+});
+```
+17. Run the following command to deploy
+```
+firebase deploy
+```
+18. Recreate database and set rules
+
+## Http Requests, Shared preferences, Rx Dart, Map View, Location, Image Picker, MIME, Url Launcher, Launch Icons
 * (flutter http)[https://pub.dartlang.org/packages/http]
 * (Shared Preferences)[https://pub.dartlang.org/packages/shared_preferences]
 * (Rx Dart)[https://pub.dartlang.org/packages/rxdart]
 * (Map View)[https://pub.dartlang.org/packages/map_view]
 * (Location)[https://pub.dartlang.org/packages/location]
+* (Image Picker)[https://pub.dartlang.org/packages/image_picker]
+* (mime)[https://pub.dartlang.org/packages/mime]
+* (url launcher)[https://pub.dartlang.org/packages/url_launcher]
+* (launcher icons)[https://pub.dartlang.org/packages/flutter_launcher_icons]
 1. Modify pubspec.yml
 ```
 dependencies:
@@ -138,22 +291,41 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^0.1.2
-  http: ^0.11.3
+  scoped_model: ^0.3.0
+  http: "^0.11.3+17"
   shared_preferences: ^0.4.3
+  rxdart: ^0.19.0
   map_view: ^0.0.14
   location: ^1.4.1
+  image_picker: ^0.4.10
+  mime: ^0.9.6+2
+  url_launcher: ^4.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+    
+  flutter_launcher_icons: ^0.6.1
+
+flutter_icons:
+  android: true 
+  ios: true
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#FFFAFAFA"
+  adaptive_icon_foreground: "assets/icon/icon.png"
 ```
 2. Run the following command
 ```
 flutter packages get
 ```
 3. Go to: https://console.developers.google.com/
-4. Enable Maps SDK for Android
-5. Enable Maps SDK for iOS
-6. Enable Maps for Static Api
-7. Enable Geocoding API
-8. Under Credentials, choose Create Credential.
-9. AndroidMainfest.xml
+4. Enable billing and enter CC details
+5. Enable Maps SDK for Android
+6. Enable Maps SDK for iOS
+7. Enable Maps for Static Api
+8. Enable Geocoding API
+9. Under Credentials, choose Create Credential.
+10. android\app\src\main\AndroidMainfest.xml
 ```
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.myapp">
@@ -200,7 +372,65 @@ flutter packages get
     </application>
 </manifest>
 ```
-10. android\build.gradle
+11. ios\Runner\Info.plist
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>myapp</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(FLUTTER_BUILD_NAME)</string>
+	<key>CFBundleSignature</key>
+	<string>????</string>
+	<key>CFBundleVersion</key>
+	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIMainStoryboardFile</key>
+	<string>Main</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+    <string>Using location to display on a map</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+    <string>Using location to display on a map</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+    <string>Product photos</string>
+	<key>NSCameraUsageDescription</key>
+    <string>Product photos</string>
+	<key>NSMicrophoneUsageDescription</key>
+    <string>Product photos</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
+</dict>
+</plist>
+```
+12. android\build.gradle
 ```
 dependencies {
         classpath 'com.android.tools.build:gradle:3.1.2'
@@ -218,6 +448,137 @@ subprojects {
     }
 }
 ```
+13. copy icon into assets\icon\icon.png
+14. Run the following command
+```
+flutter pub get
+flutter pub pub run flutter_launcher_icons:main
+```
+15. Icon directories
+```
+android\app\src\main\res
+ios\Runner\Assets.xcassets\AppIcon.appiconset
+```
+16. Set application name for android in android\app\src\main\AndroidManifest.xml by setting android:label attribute
+```
+android:label="AppName"
+```
+17. Set application name for iOS in ios\Runner\Info.plist by setting the CFBundName string
+```
+<key>CFBundleName</key>
+<string>AppName</string>
+```
+
+## Android Splash Screen
+1. android\src\main\res\drawable
+```
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Modify this file to customize your launch splash screen -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@android:color/white" />
+    <item android:drawable="@drawable/ic_launcher_foreground" />
+    <!-- You can insert your own image assets here -->
+    <!-- <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@mipmap/launch_image" />
+    </item> -->
+</layer-list>
+```
+
+## iOS Splash Screen
+1. ios\Runner\LaunchImage.imageset
+2. Copy the android files and override ios files.
+```
+android\src\main\res\drawable\drawable-mdpi\ic_launcher_foreground.png > LaunchImage.png
+android\src\main\res\drawable\drawable-hdpi\ic_launcher_foreground.png > LaunchImage@2x.png
+android\src\main\res\drawable\drawable-xhdpi\ic_launcher_foreground.png > LaunchImage@3x.png
+android\src\main\res\drawable\drawable-xxhdpi\ic_launcher_foreground.png > LaunchImage@4x.png
+```
+3. ios\Runner\LaunchImage.imageset\Contents.json
+```
+{
+  "images" : [
+    {
+      "idiom" : "universal",
+      "filename" : "LaunchImage.png",
+      "scale" : "1x"
+    },
+    {
+      "idiom" : "universal",
+      "filename" : "LaunchImage@2x.png",
+      "scale" : "2x"
+    },
+    {
+      "idiom" : "universal",
+      "filename" : "LaunchImage@3x.png",
+      "scale" : "3x"
+    },
+    {
+      "idiom" : "universal",
+      "filename" : "LaunchImage@4x.png",
+      "scale" : "4x"
+    }
+  ],
+  "info" : {
+    "version" : 1,
+    "author" : "xcode"
+  }
+}
+```
+
+## Releasing for Android
+* (Android Release)[https://flutter.io/android-release/]
+1. android\app\src\build.gradle applicationId "com.example.myapp" must be unique and match with package="com.example.myapp" in android\app\src\main\AndroidMainifest.xml
+2. upgrade android\app\src\build.gradle defaultConfig versionCode > Internal and versionName > external each time a release is made.
+3. Create a key store
+```
+keytool -genkey -v -keystore c:\keys\key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias key
+```
+4. Create new file android\key.properties
+```
+storePassword=<password from previous step>
+keyPassword=<password from previous step>
+keyAlias=key
+storeFile=C:/keys/key.jks
+```
+5. Add key.properties to .gitignore
+6. add the following lines aboe android in android\app\main\build.gradle
+```
+def keystorePropertiesFile = rootProject.file("key.properties")
+def keystoreProperties = new Properties()
+keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+
+android {
+```
+7. Replace buildTypes with the following
+```
+signingConfigs {
+    release {
+     keyAlias keystoreProperties['keyAlias']
+     keyPassword keystoreProperties['keyPassword']
+     storeFile file(keystoreProperties['storeFile'])
+     storePassword keystoreProperties['storePassword']
+  }
+}
+buildTypes {
+  release {
+    signingConfig signingConfigs.release
+  }
+}
+```
+8. Run the following command
+```
+flutter build apk
+```
+9. Outputs to the following directory
+```
+build\app\outputs\apk\release\app-release.apk
+```
+10. Go to Google Play Console
+
+## Releasing for iOS
+* (iOS Release)[https://flutter.io/ios-release/]
 
 ## /shared/result.dart
 ```
@@ -1507,6 +1868,141 @@ final targetWidth = deviceWidth > 550.0 ? 500.0 : deviceWidth * 0.95;
                     child: Text('My Button')),
                 onTap: () {})
 ```
+
+## Native Android Code
+1. android\app\src\main\java\com\example\myapp\MainActivity.java
+```
+package com.example.myapp;
+
+import android.os.Bundle;
+import android.content.ContextWrapper;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.BatteryManager;
+import android.os.Build.VERSION;
+import android.os.Build.VERSION_CODES;
+
+import io.flutter.app.FlutterActivity;
+import io.flutter.plugins.GeneratedPluginRegistrant;
+
+import io.flutter.plugin.common.MethodCall;
+import io.flutter.plugin.common.MethodChannel;
+import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
+import io.flutter.plugin.common.MethodChannel.Result;
+
+public class MainActivity extends FlutterActivity {
+  private static final String CHANNEL = "flutter-course.com/battery";
+
+  private int getBatteryLevel(){
+    int batteryLevel = -1;
+    if (VERSION.SDK_INT >= VERSION_CODES.LOLLIPOP)
+    {
+      BatteryManager batteryManager = (BatteryManager) getSystemService(BATTERY_SERVICE);
+      batteryLevel = batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+    }
+    else
+    {
+      Intent intent = new ContextWrapper(getApplicationContext())
+      .registerReceiver(null new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+      batteryLevel = (intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) * 100) / intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+    }
+
+    return batteryLevel;
+  }
+
+  @Override
+  protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    new MethodChannel(getFlutterView(), CHANNEL)
+    .setMethodCallHandler(new MethodCallHandler(){
+      @Override
+      public void onMethodCall(MEthodCall call, Result result)
+      {
+        if(call.method.equals("getBatteryLevel"))
+        {
+          int batteryLevel = getBatteryLevel();
+          if(batteryLevel != -1)
+          {
+            result.success(batteryLevel);
+          }
+          else{
+            result.error("UNAVAILABLE", "Could not fetch battery level.", null);
+          }
+        }
+        else
+        {
+          result.notImplemented();
+        }
+      }
+    });
+    GeneratedPluginRegistrant.registerWith(this);
+  }
+}
+ 
+```
+2. battery.dart
+```
+import 'package:flutter/services.dart';
+
+Future<String> getBatteryLevel() async {
+  final _platformChannel = MethodChannel('flutter-course.com/battery');
+  String batteryLevel;
+  try {
+    final int result = await _platformChannel.invokeMethod('getBatteryLevel');
+    batteryLevel = 'Battery level is $result %.';
+  } catch (err) {
+    batteryLevel = 'Failed to get battery level.';
+  }
+  return batteryLevel;
+}
+```
+
+## iOS Native
+1. ios\Runner\AppDelegate.m
+```
+#include "AppDelegate.h"
+#include "GeneratedPluginRegistrant.h"
+
+#import <Flutter/Flutter.h>
+
+@implementation AppDelegate
+
+- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
+  [GeneratedPluginRegistrant registerWithRegistry:self];
+  // Override point for customization after application launch.
+  FlutterViewController* controller = (FlutterViewController*)self.window.rootViewController;
+  FlutterMethodChannel* batteryChannel = [FlutterMethodChannel methodChannelWithName: @"flutter-course.com/battery" binaryMessenger: controller];
+  [batteryChannel setMethodCallHandler: ^(FlutterMethodCall* call, FlutterResult result) {
+    if ([@"getBatteryLevel" isEqualToString:call.method]) {
+      int batteryLevel = [self getBatteryLevel];
+
+      if (batteryLevel == -1) {
+        result([FlutterError errorWithCode:@"UNAVAILABLE" message:@"Battery info not available." details:nil]);
+      } else {
+        result(@(batteryLevel));
+      }
+    } else {
+      result(FlutterMethodNotImplemented);
+    }
+  }];
+  return [super application:application didFinishLaunchingWithOptions:launchOptions];
+}
+
+- (int)getBatteryLevel {
+  UIDevice* device = UIDevice.currentDevice;
+  device.batteryMonitoringEnabled = YES;
+  if (device.batteryState == UIDeviceBatteryStateUnknown) {
+    return -1;
+  } else {
+    return (int)(device.batteryLevel * 100);
+  }
+}
+
+@end
+```
+
+## Animations
+* (Flutter Animations)[https://flutter.io/animations/]
 
 ## Authors
 

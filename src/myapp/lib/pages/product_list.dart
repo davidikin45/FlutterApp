@@ -23,7 +23,7 @@ class _ProductListPageState extends State<ProductListPage>{
   @override
   initState()
   {
-    widget.model.fetchProducts(onlyForUser: true);
+    widget.model.fetchProducts(onlyForUser: true, clearExisting: true);
     super.initState();
   }
 
@@ -38,7 +38,7 @@ class _ProductListPageState extends State<ProductListPage>{
 
   Widget _buildListItem(BuildContext context, int index, Product product, MainModel model) {
     return ListTile(
-        leading: CircleAvatar(backgroundImage: NetworkImage(product.image)),
+        leading: CircleAvatar(backgroundImage: NetworkImage(product.imagePath)),
         title: Text(product.title),
         subtitle: Text('\$${product.price.toString()}'),
         trailing: _buildEditButton(context, index, model));

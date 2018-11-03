@@ -10,9 +10,8 @@ import '../../scoped-models/main.dart';
 
 class ProductCard extends StatelessWidget {
   final Product product;
-  final int productIndex;
 
-  ProductCard(this.product, this.productIndex);
+  ProductCard(this.product);
 
   Widget _buildTitlePriceRow() {
     return Container(
@@ -20,9 +19,9 @@ class ProductCard extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
-          TitleDefault(product.title),
-          SizedBox(width: 8.0),
-          PriceTag(product.price.toString())
+          Flexible(child: TitleDefault(product.title)),
+          Flexible(child: SizedBox(width: 8.0)),
+          Flexible(child: PriceTag(product.price.toString()))
         ],
       ),
     );
@@ -35,15 +34,19 @@ class ProductCard extends StatelessWidget {
         IconButton(
             icon: Icon(Icons.info),
             color: Theme.of(context).accentColor,
-            onPressed: () => Navigator.pushNamed<bool>(
-                context, '/product/' + model.allProducts[productIndex].id)),
+            onPressed: (){ 
+              model.selectProduct(product.id);
+              Navigator.pushNamed<bool>(
+                context, '/product/' + product.id).then((_){
+                   model.selectProduct(null);
+                });}),
         IconButton(
             color: Colors.red,
-            icon: Icon(model.allProducts[productIndex].isFavourite
+            icon: Icon(product.isFavourite
                 ? Icons.favorite
                 : Icons.favorite_border),
             onPressed: () {
-              model.selectProduct(model.allProducts[productIndex].id);
+              model.selectProduct(product.id);
               model.toggleProductFavouriteStatus();
             })
       ]);
@@ -52,19 +55,24 @@ class ProductCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO: implement build
     return Card(
-        child: Column(children: <Widget>[
-      //Image.asset(product.image),
-      FadeInImage(
-          image: NetworkImage(product.image),
-          height: 300.0,
-          fit: BoxFit.cover,
-          placeholder: AssetImage('assets/food.jpg')),
-      _buildTitlePriceRow(),
-      AddressTag(product.locAddress),
-      Text(product.userEmail),
-      _buildActionButtons(context)
-    ]));
+      child: Column(
+        children: <Widget>[
+          Hero(
+            tag: product.id,
+            child: FadeInImage(
+              image: NetworkImage(product.imageUrl),
+              height: 300.0,
+              fit: BoxFit.cover,
+              placeholder: AssetImage('assets/food.jpg'),
+            ),
+          ),
+          _buildTitlePriceRow(),
+          SizedBox(height: 10.0),
+          AddressTag(product.locAddress),
+          _buildActionButtons(context)
+        ],
+      ),
+    );
   }
 }

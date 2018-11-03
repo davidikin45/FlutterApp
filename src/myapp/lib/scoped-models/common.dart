@@ -1,6 +1,8 @@
+import 'dart:io';
+import 'dart:async';
+
 import 'package:scoped_model/scoped_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:async';
 
 import 'package:rxdart/subjects.dart';
 
@@ -8,6 +10,7 @@ import '../models/auth.dart';
 import '../models/user.dart';
 import '../models/product.dart';
 
+import '../apis/image_upload.dart';
 import '../apis/auth.dart';
 import '../apis/product.dart';
 import '../shared/result.dart';
@@ -131,6 +134,7 @@ class UserModel extends CommonModel {
     _authenticatedUser = null;
     _authTimer.cancel();
     _userSubject.add(false);
+    _selProductId = null;
     final SharedPreferences prefs = await SharedPreferences.getInstance();
     prefs.remove('token');
     prefs.remove('userEmail');
@@ -171,8 +175,12 @@ class ProductsModel extends CommonModel {
     return _products.indexWhere((p) => p.id == _selProductId);
   }
 
-  Future<Null> fetchProducts({bool onlyForUser = false}) async {
+  Future<Null> fetchProducts({bool onlyForUser = false, clearExisting = false}) async {
     showSpinner();
+    if(clearExisting)
+    {
+      _products = [];
+    }
     try {
       var resp = await ProductApi(_authenticatedUser.token).fetchAll();
       if (!resp.success) {
@@ -181,13 +189,16 @@ class ProductsModel extends CommonModel {
       }
 
       final List<Product> list = [];
-      resp.data.where((p){ return !onlyForUser || p.userId == _authenticatedUser.id; }).forEach((p) {
+      resp.data.where((p) {
+        return !onlyForUser || p.userId == _authenticatedUser.id;
+      }).forEach((p) {
         list.add(Product(
             id: p.id,
             title: p.title,
             description: p.description,
             price: p.price,
-            image: p.image,
+            imagePath: p.imagePath,
+            imageUrl: p.imageUrl,
             userEmail: p.userEmail,
             userId: p.userId,
             isFavourite: p.wishListUsers.containsKey(_authenticatedUser.id),
@@ -206,15 +217,22 @@ class ProductsModel extends CommonModel {
     }
   }
 
-  Future<Result> addProduct(
-      String title, String description, String image, double price, GeocodingResult location) async {
+  Future<Result> addProduct(String title, String description, File image,
+      double price, GeocodingResult location) async {
     showSpinner();
     try {
+      var imageResp =
+          await ImageUploadApi(_authenticatedUser.token).uploadImage(image);
+      if (!imageResp.success) {
+        hideSpinner();
+        return Result.fail('Please try again!');
+      }
+
       final payload = ProductDto(
           title: title,
           description: description,
-          image:
-              'https://moneyinc.com/wp-content/uploads/2017/07/Chocolate.jpg',
+          imagePath: imageResp.data.imagePath,
+          imageUrl: imageResp.data.imageUrl,
           price: price,
           userEmail: _authenticatedUser.email,
           userId: _authenticatedUser.id,
@@ -232,7 +250,8 @@ class ProductsModel extends CommonModel {
           id: resp.data,
           title: title,
           description: description,
-          image: image,
+          imagePath: imageResp.data.imagePath,
+          imageUrl: imageResp.data.imageUrl,
           price: price,
           userEmail: _authenticatedUser.email,
           userId: _authenticatedUser.id,
@@ -249,15 +268,32 @@ class ProductsModel extends CommonModel {
     }
   }
 
-  Future<Result> updateProduct(
-      String title, String description, String image, double price, GeocodingResult location) async {
+  Future<Result> updateProduct(String title, String description, File image,
+      double price, GeocodingResult location) async {
     showSpinner();
     try {
+
+      String imageUrl = selectedProduct.imageUrl;
+      String imagePath = selectedProduct.imagePath;
+      if (image != null) {
+
+        var imageResp =
+            await ImageUploadApi(_authenticatedUser.token).uploadImage(image);
+
+        if (!imageResp.success) {
+          hideSpinner();
+          return Result.fail('Please try again!');
+        }
+
+        imageUrl = imageResp.data.imageUrl;
+        imagePath = imageResp.data.imagePath;
+      }
+
       final payload = ProductDto(
           title: title,
           description: description,
-          image:
-              'https://moneyinc.com/wp-content/uploads/2017/07/Chocolate.jpg',
+          imagePath: imagePath,
+          imageUrl: imageUrl,
           price: price,
           userEmail: selectedProduct.userEmail,
           userId: selectedProduct.userId,
@@ -276,14 +312,14 @@ class ProductsModel extends CommonModel {
           id: selectedProduct.id,
           title: title,
           description: description,
-          image: image,
+          imagePath: imagePath,
+          imageUrl: imageUrl,
           price: price,
           userEmail: selectedProduct.userEmail,
           userId: selectedProduct.userId,
           locAddress: location.address,
           locLat: location.latitude,
           locLng: location.longitude);
-
 
       _products[selectedProductIndex] = updatedProduct;
       hideSpinner();
@@ -323,7 +359,8 @@ class ProductsModel extends CommonModel {
         title: selectedProduct.title,
         description: selectedProduct.description,
         price: selectedProduct.price,
-        image: selectedProduct.image,
+        imagePath: selectedProduct.imagePath,
+        imageUrl: selectedProduct.imageUrl,
         userEmail: selectedProduct.userEmail,
         userId: selectedProduct.userId,
         isFavourite: newFavouriteStatus,
@@ -332,7 +369,7 @@ class ProductsModel extends CommonModel {
         locLng: selectedProduct.locLng);
     _products[selectedProductIndex] = updatedProduct;
     triggerRender();
-    
+
     if (newFavouriteStatus) {
       try {
         var resp = await ProductApi(_authenticatedUser.token)
@@ -357,7 +394,8 @@ class ProductsModel extends CommonModel {
           title: selectedProduct.title,
           description: selectedProduct.description,
           price: selectedProduct.price,
-          image: selectedProduct.image,
+          imagePath: selectedProduct.imagePath,
+          imageUrl: selectedProduct.imageUrl,
           userEmail: selectedProduct.userEmail,
           userId: selectedProduct.userId,
           isFavourite: !newFavouriteStatus,
@@ -368,12 +406,13 @@ class ProductsModel extends CommonModel {
       _products[selectedProductIndex] = updatedProduct;
       triggerRender();
     }
+
+    _selProductId = null;
   }
 
   void selectProduct(String id) {
     _selProductId = id;
-    if (id != null)
-    {
+    if (id != null) {
       triggerRender();
     }
   }

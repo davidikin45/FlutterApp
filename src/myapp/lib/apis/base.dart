@@ -7,7 +7,7 @@ abstract class ApiBase {
     return json.encode(payload);
   }
 
-  ApiResult<Map<String, dynamic>> getResponseData(http.Response response) {
+  ApiResult<Map<String, dynamic>> getResponseAsJson(http.Response response) {
     final Map<String, dynamic> responseData = json.decode(response.body);
     
     if (response.statusCode != 200 && response.statusCode != 201) {
@@ -15,6 +15,20 @@ abstract class ApiBase {
     }
 
     return Result.okApi(responseData, responseData);
+  }
+
+  ApiResult<bool> getResponseAsBoolean(http.Response response) {
+    final bool responseData = response.body.toLowerCase() == 'true';
+
+    final Map<String, dynamic> json = {
+      '' : responseData
+    };
+    
+    if (response.statusCode != 200 && response.statusCode != 201) {
+        return Result.failApi(responseData, json, 'Response statusCode ${response.statusCode.toString()}');
+    }
+
+    return Result.okApi(responseData, json);
   }
 }
 
@@ -28,7 +42,7 @@ abstract class FirebaseApi extends ApiBase {
   Future<ApiResult<Map<String, dynamic>>> fetchAll() async {
     var resp = await http.get('$baseUrl/$tableName.json?auth=$token');
 
-    var apiResponse = getResponseData(resp);
+    var apiResponse = getResponseAsJson(resp);
 
     return apiResponse;
   }
@@ -38,7 +52,7 @@ abstract class FirebaseApi extends ApiBase {
     var resp = await http.post('$baseUrl/$tableName.json?auth=$token',
         body: getRequestBody(payload));
 
-    var apiResponse = getResponseData(resp);
+    var apiResponse = getResponseAsJson(resp);
 
     return apiResponse;
   }
@@ -50,7 +64,7 @@ abstract class FirebaseApi extends ApiBase {
     var resp = await http.put('$baseUrl/$tableName/$id.json?auth=$token',
         body: getRequestBody(payload));
 
-    var apiResponse = getResponseData(resp);
+    var apiResponse = getResponseAsJson(resp);
 
     return apiResponse;
   }
@@ -58,7 +72,7 @@ abstract class FirebaseApi extends ApiBase {
   Future<ApiResult<Map<String, dynamic>>> delete(String id) async {
     var resp = await http.delete('$baseUrl/$tableName/$id.json?auth=$token');
 
-    var apiResponse = getResponseData(resp);
+    var apiResponse = getResponseAsJson(resp);
 
     return apiResponse;
   }

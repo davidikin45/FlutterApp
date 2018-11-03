@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import 'package:map_view/map_view.dart';
 
+import '../widgets/products/product_fab.dart';
 import '../widgets/ui_elements/title_default.dart';
 import '../models/product.dart';
 
@@ -25,15 +26,14 @@ class ProductPage extends StatelessWidget {
             title: 'Product Location'),
         toolbarActions: [ToolbarAction('Close', 1)]);
 
-        mapView.onToolbarAction.listen((int id){
-            if(id == 1)
-            {
-              mapView.dismiss();
-            }
-        });
-        mapView.onMapReady.listen((_){
-          mapView.setMarkers(markers);
-        });
+    mapView.onToolbarAction.listen((int id) {
+      if (id == 1) {
+        mapView.dismiss();
+      }
+    });
+    mapView.onMapReady.listen((_) {
+      mapView.setMarkers(markers);
+    });
   }
 
   Widget _buildAddressPriceRow(String address, double price) {
@@ -70,32 +70,41 @@ class ProductPage extends StatelessWidget {
           return Future.value(false);
         },
         child: Scaffold(
-          appBar: AppBar(
-            title: Text(product.title),
-          ),
-          body: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: <Widget>[
-              //Image.asset(product.image),
-              FadeInImage(
-                  image: NetworkImage(product.image),
-                  height: 300.0,
-                  fit: BoxFit.cover,
-                  placeholder: AssetImage('assets/food.jpg')),
-              Container(
-                padding: EdgeInsets.all(10.0),
-                child: TitleDefault(product.title),
-              ),
-              _buildAddressPriceRow(product.locAddress, product.price),
-              Container(
-                padding: EdgeInsets.all(10.0),
-                child: Text(
-                  product.description,
-                  textAlign: TextAlign.center,
+          // appBar: AppBar(
+          //   title: Text(product.title),
+          // ),
+          body: CustomScrollView(slivers: <Widget>[
+            SliverAppBar(
+                expandedHeight: 256.0,
+                pinned: true,
+                flexibleSpace: FlexibleSpaceBar(
+                    title: Text(product.title),
+                    background: Hero(
+                        tag: product.id,
+                        child: FadeInImage(
+                            image: NetworkImage(product.imagePath),
+                            height: 300.0,
+                            fit: BoxFit.cover,
+                            placeholder: AssetImage('assets/food.jpg'))))),
+            SliverList(
+              delegate: SliverChildListDelegate([
+                Container(
+                  padding: EdgeInsets.all(10.0),
+                  alignment: Alignment.center,
+                  child: TitleDefault(product.title),
                 ),
-              )
-            ],
-          ),
+                _buildAddressPriceRow(product.locAddress, product.price),
+                Container(
+                  padding: EdgeInsets.all(10.0),
+                  child: Text(
+                    product.description,
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              ]),
+            )
+          ]),
+          floatingActionButton: ProductFAB(product),
         ));
   }
 }

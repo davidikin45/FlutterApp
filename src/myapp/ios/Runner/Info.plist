@@ -26,6 +26,16 @@
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+    <string>Using location to display on a map</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+    <string>Using location to display on a map</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+    <string>Product photos</string>
+	<key>NSCameraUsageDescription</key>
+    <string>Product photos</string>
+	<key>NSMicrophoneUsageDescription</key>
+    <string>Product photos</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

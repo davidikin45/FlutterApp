@@ -12,11 +12,16 @@ import './pages/product.dart';
 import './models/product.dart';
 import './scoped-models/main.dart';
 
+import './widgets/helpers/custom_route.dart';
+
+import './shared/keys.dart' as keys;
+import './shared/config.dart' as config;
+
 void main() {
   debugPaintSizeEnabled = false;
   debugPaintBaselinesEnabled = false;
   debugPaintPointersEnabled = false;
-  MapView.setApiKey('AIzaSyAOk-MlYBXq2r7r-vQTMvbMyTGPBrH-b7o');
+  MapView.setApiKey(keys.googleApiKey);
   runApp(MyApp());
 }
 
@@ -30,6 +35,8 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   final MainModel _model = MainModel();
   bool _isAuthenticated = false;
+
+
 
   @override
   void initState() {
@@ -66,7 +73,7 @@ class _MyAppState extends State<MyApp> {
     if (pathElements[1] == 'product') {
       final String id = pathElements[2];
       final Product product = _model.allProducts.firstWhere((p) => p.id == id);
-      return MaterialPageRoute<bool>(
+      return CustomRoute<bool>(
         builder: (BuildContext context) => !_isAuthenticated ? AuthPage() : ProductPage(product),
       );
     }
@@ -84,13 +91,9 @@ class _MyAppState extends State<MyApp> {
         //one instance of model
         model: _model,
         child: MaterialApp(
+            title: config.appTitle,
             //debugShowMaterialGrid: true,
-            theme: ThemeData(
-                //fontFamily: 'Oswald',
-                brightness: Brightness.light,
-                primarySwatch: Colors.deepOrange,
-                accentColor: Colors.deepPurple,
-                buttonColor: Colors.deepPurple),
+            theme: config.getAdaptiveThemeData(context),
             //home: AuthPage(),
             routes: staticRoutes(),
             onGenerateRoute: (RouteSettings settings) =>

@@ -6,7 +6,8 @@ class Product {
   final String title;
   final String description;
   final double price;
-  final String image;
+  final String imagePath;
+  final String imageUrl;
   final bool isFavourite;
 
   final String userEmail;
@@ -21,7 +22,8 @@ class Product {
     @required this.title, 
     @required this.description, 
     @required this.price, 
-    @required this.image,
+    @required this.imagePath,
+    @required this.imageUrl,
     @required this.userEmail,
     @required this.userId,
     @required this.locAddress,

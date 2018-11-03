@@ -43,3 +43,18 @@ class AuthenticationResponseDto {
         localId: json['localId']);
   }
 }
+
+class ImageUploadResponseDto {
+  final String imagePath;
+  final String imageUrl;
+
+  ImageUploadResponseDto(
+      {@required this.imagePath,
+      @required this.imageUrl});
+
+  factory ImageUploadResponseDto.fromJson(Map<String, dynamic> json) {
+    return ImageUploadResponseDto(
+        imagePath: json['imagePath'],
+        imageUrl: json['imageUrl']);
+  }
+}

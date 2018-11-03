@@ -12,15 +12,14 @@ class ProductsPage extends StatefulWidget {
   ProductsPage(this.model);
 
   @override
-    State<StatefulWidget> createState() {
-      return _ProductsPageState();
-    }
+  State<StatefulWidget> createState() {
+    return _ProductsPageState();
+  }
 }
 
 class _ProductsPageState extends State<ProductsPage> {
   @override
-  initState()
-  {
+  initState() {
     widget.model.fetchProducts();
     super.initState();
   }
@@ -28,32 +27,34 @@ class _ProductsPageState extends State<ProductsPage> {
   Widget _buildSideMenu(BuildContext context) {
     return Drawer(
         child: Column(children: <Widget>[
-      AppBar(automaticallyImplyLeading: false, title: Text('Choose')),
+      AppBar(
+          elevation:
+              Theme.of(context).platform == TargetPlatform.iOS ? 0.0 : 4.0,
+          automaticallyImplyLeading: false,
+          title: Text('Choose')),
       ListTile(
           leading: Icon(Icons.edit),
           title: Text('Manage Products'),
           onTap: () {
             Navigator.pushReplacementNamed(context, '/admin');
           }),
-          Divider(),
-          LogoutListTile()
+      Divider(),
+      LogoutListTile()
     ]));
   }
 
-  Widget _builProductsList()
-  {
-   return ScopedModelDescendant<MainModel>(builder:
-                (BuildContext context, Widget child, MainModel model) {
-                  Widget content = Center(child: Text('No Products Found!'));
-                  if(model.displayedProducts.length >  0 && !model.isLoading)
-                  {
-                    content = Products();
-                  }else if (model.isLoading){
-                    //spinner
-                    content =  Center(child:CircularProgressIndicator());
-                  }
-              return RefreshIndicator(onRefresh:model.fetchProducts, child: content);
-            });
+  Widget _builProductsList() {
+    return ScopedModelDescendant<MainModel>(
+        builder: (BuildContext context, Widget child, MainModel model) {
+      Widget content = Center(child: Text('No Products Found!'));
+      if (model.displayedProducts.length > 0 && !model.isLoading) {
+        content = Products();
+      } else if (model.isLoading) {
+        //spinner
+        content = Center(child: CircularProgressIndicator());
+      }
+      return RefreshIndicator(onRefresh: model.fetchProducts, child: content);
+    });
   }
 
   @override
@@ -61,12 +62,15 @@ class _ProductsPageState extends State<ProductsPage> {
     return Scaffold(
         drawer: _buildSideMenu(context),
         appBar: AppBar(
+          elevation: Theme.of(context).platform == TargetPlatform.iOS ? 0.0 : 4.0,
           title: Text('EasyList'),
           actions: <Widget>[
-            ScopedModelDescendant<MainModel>(builder:
-                (BuildContext context, Widget child, MainModel model) {
+            ScopedModelDescendant<MainModel>(
+                builder: (BuildContext context, Widget child, MainModel model) {
               return IconButton(
-                icon: Icon(model.displayFavouritesOnly ?  Icons.favorite : Icons.favorite_border),
+                icon: Icon(model.displayFavouritesOnly
+                    ? Icons.favorite
+                    : Icons.favorite_border),
                 onPressed: () {
                   model.toggleDisplayMode();
                 },
